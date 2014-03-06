@@ -257,6 +257,7 @@ int buffernum = 0;
 int printi = 0;
 int buffer_switch = 0;
 int brightness = 200;
+boolean decoding=false;
 
 long Dec[10] = {
   1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
@@ -302,7 +303,14 @@ void setup() {
   SerialUSB.begin(115200);
   while (!SerialUSB)
   {
-    ;
+  }
+  for (n=0;n<100;n++)
+  {
+    filename[n]=0;
+  }
+  for (n=0;n<200;n++)
+  {
+    data[n]=0;
   }
   LCD.begin(20, 4);
   LCD.createChar(1, ArrowR);
@@ -327,7 +335,12 @@ void setup() {
   extruder_ctrl.SetMode(AUTOMATIC);
 
   filename[0] = '/';
-  filename[1] = '\n';
+  filename[1] = '1';
+  filename[2]='.';
+  filename[3]='t';
+  filename[4]='x';
+  filename[5]='t';
+  filename[6]=0;
   StopSteppers();
   current.x = 0.0;
   current.y = 0.0;
@@ -387,13 +400,7 @@ void setup() {
   TestYMINPos = true;
   TestZMINPos = true;
 
-  Scheduler.startLoop(TempControl);
-  Scheduler.startLoop(SerialUSBReport);
-  Scheduler.startLoop(Print);
-  Scheduler.startLoop(SDtoMEM);
-  Scheduler.startLoop(SerialCLI);
-  Scheduler.startLoop(LCDTimer);
-  Scheduler.startLoop(LCDUpdate);
+
 
   SerialUSB.println("SYSTEM INITIALIZED");
   LCD.setCursor(0, 2);
@@ -1286,6 +1293,7 @@ void LCDUpdate()
 
 
 void LCDTimer() {
+  
   if (refresh > 0)
   {
     analogWrite(LCD_LED_PIN, brightness);
@@ -1347,6 +1355,7 @@ void SerialCLI() {
     else
     {
       data[i - 1] = SerialUSB.read();
+      SerialUSB.print(data[i-1],HEX);
       if (data[i - 1] == '\r' || data[i - 1] == '\n')
         flag = 1;
       i++;
@@ -1373,7 +1382,12 @@ void SerialCLI() {
         for (n = 0; n < i - 1; n++)
         {
           filename[n] = data[n];
-          SerialUSB.print(filename[n]);
+          SerialUSB.print(filename[n],HEX);
+        }
+        filename[n-1]=0;
+        for (n = 0; n < i; n++)
+        {
+          SerialUSB.print(filename[n],HEX);
         }
 
         break;
@@ -1396,7 +1410,6 @@ void SerialCLI() {
           dataFile = SD.open(filename);
           if (dataFile)
           {
-
             if (resume_position < dataFile.size())
             {
               fileposition = resume_position;
@@ -1449,8 +1462,8 @@ void SerialCLI() {
           digitalWrite(FAN_PIN, LOW);
           buffer_switch = 0;
 
-          long stopposition = bufferstartposition[buffernum] + printi;
-          long stopline = membuffer[buffernum][printi].start;
+          long stopposition = membuffer[buffernum][printi].start; 
+  long stopline =bufferstartposition[buffernum] + printi;
           SerialUSB.print("Printing process is interrupted at ");
           SerialUSB.print(stopposition);
           SerialUSB.print("(Instruction No. ");
@@ -1517,19 +1530,26 @@ void TempControl()
 
 void Print()
 {
-  if (print_switch == 1)
+  if ((print_switch == 1)&&(!decoding))
   {
+    SerialUSB.print("Print start");
     for (printi = 0; printi < bufferlength[buffernum]; printi++)
+    {
+      SerialUSB.println("Print->Decode");
       Decode(membuffer[buffernum][printi].st, membuffer[buffernum][printi].leng);
-  }
+      if(decoding)
+      yield();
+    }
+  
   print_switch = 0;
   buffernum = 1 - buffernum;
+  }
   yield();
 }
 
 void SerialUSBReport()
 {
-  if (report_delay)
+  if ((report_delay)&&(!decoding))
   {
     double report;
     report = membuffer[buffernum][printi].start / filesize;
@@ -1568,46 +1588,101 @@ void SerialUSBReport()
 
 void SDtoMEM()
 {
-  if (buffer_switch == 1)
+  if ((buffer_switch == 1)&&(!decoding))
   {
     dataFile = SD.open(filename);
     if (dataFile)
     {
       dataFile.seek(fileposition);
+      buffernum=1;
       char ch;
       filesize = dataFile.size();
-      while (fileposition < filesize) {
-        int bufferposition = 0;
+      SerialUSB.println(filesize);
+      int bufferposition = 1;
+        bufferstartposition[1-buffernum] = fileposition;
         ch = dataFile.read();
+        SerialUSB.print(ch);
         fileposition++;
-        while ((buffer_switch == 1) && (dataFile.available() > 0) && (print_switch == 1) && (bufferposition < BUFFER_SIZE))
+        
+        
+        
+        while ((buffer_switch == 1) && (dataFile.available() > 0) && (bufferposition < BUFFER_SIZE)&&(fileposition < (filesize)))
         {
           j = 0;
-          while ((buffer_switch == 1) && (dataFile.available() > 0) && (ch != '\n') && (ch != ';'))
+          while ((buffer_switch == 1) && (dataFile.available() > 0) && (ch != '\n') && (ch != ';')&&(fileposition < (filesize)))
           {
             membuffer[1 - buffernum][bufferposition].st[j] = ch;
             j++;
             fileposition++;
             ch = dataFile.read();
+            SerialUSB.print(ch);
           }
-          if (ch == ';')
-            while (ch != '\n')
+          if ((ch == ';'))
+            while ((ch != '\n')&&(fileposition < (filesize)))
             {
               ch = dataFile.read();
               fileposition++;
+              j++;
             }
-          membuffer[1 - buffernum][bufferposition].leng = j;
-          membuffer[1 - buffernum][bufferposition].start = fileposition - j;
+          membuffer[1 - buffernum][bufferposition].leng = j+1;
+          membuffer[1 - buffernum][bufferposition].st[j]=0;
+          SerialUSB.println();
+          SerialUSB.println(j);
+          membuffer[1 - buffernum][bufferposition].start = fileposition - j-1;
+          SerialUSB.println(fileposition-j-1);
+          SerialUSB.println(fileposition);
           bufferposition++;
+          if ((fileposition < (filesize)))
           ch = dataFile.read();
+          SerialUSB.print(ch);
           fileposition++;
         }
         bufferlength[1 - buffernum] = bufferposition;
-        bufferstartposition[1 - buffernum] = fileposition - BUFFER_SIZE;
+        SerialUSB.println(fileposition);
+        buffernum=0;
+      print_switch=1;
+      
+      /*
+      
+      
+      while (fileposition < filesize) {
+        int bufferposition = 0;
+        bufferstartposition[1 - buffernum] = fileposition;
+        ch = dataFile.read();
+        SerialUSB.print(ch);
+        fileposition++;
+        while ((buffer_switch == 1) && (dataFile.available() > 0) && (print_switch == 1) && (bufferposition < BUFFER_SIZE)&&(fileposition < (filesize-1)))
+        {
+          j = 0;
+          while ((buffer_switch == 1) && (dataFile.available() > 0) && (ch != '\n') && (ch != ';')&&(fileposition < (filesize-1)))
+          {
+            membuffer[1 - buffernum][bufferposition].st[j] = ch;
+            j++;
+            fileposition++;
+            ch = dataFile.read();
+            SerialUSB.print(ch);
+          }
+          if (ch == ';')
+            while ((ch != '\n')&&(fileposition < (filesize-1)))
+            {
+              ch = dataFile.read();
+              fileposition++;
+              j++;
+            }
+          membuffer[1 - buffernum][bufferposition].leng = j;
+          SerialUSB.println(j);
+          membuffer[1 - buffernum][bufferposition].start = fileposition - j-2;
+          SerialUSB.println(fileposition-j);
+          bufferposition++;
+          ch = dataFile.read();
+          SerialUSB.print(ch);
+          fileposition++;
+        }
+        bufferlength[1 - buffernum] = bufferposition;
         while (print_switch == 1);
         yield();
         print_switch = 1;
-      }
+      }*/
       dataFile.close();
       SerialUSB.print("PRINT PROCESS DONE");
       page = 11;
@@ -1754,6 +1829,9 @@ void ClearKey()
 
 void Decode(char instruction[], int length)
 {
+  decoding=true;
+  SerialUSB.println("Decode");
+  SerialUSB.println(instruction);
   if (instruction[0] == ';')
     return;
   FloatPt fp;
@@ -1808,6 +1886,8 @@ void Decode(char instruction[], int length)
           }
           else
             feedrate_micros = 60000000 / x_unit / MAX_FEEDRATE;
+            SerialUSB.print("Move");
+            SerialUSB.println(feedrate_micros);
           Move(feedrate_micros);
 
           SerialUSB.print("X Axis=");
@@ -2036,7 +2116,7 @@ void Decode(char instruction[], int length)
         break;
     }
   }
-  yield();
+  decoding=false;
 }
 
 double FindData(char keyword, char instruction[], int strlength)
@@ -2244,8 +2324,8 @@ void KeyEMPressed()
   digitalWrite(FAN_PIN, LOW);
   buffer_switch = 0;
 
-  long stopposition = bufferstartposition[buffernum] + printi;
-  long stopline = membuffer[buffernum][printi].start;
+  long stopposition = membuffer[buffernum][printi].start; 
+  long stopline =bufferstartposition[buffernum] + printi;
   SerialUSB.print("Printing process is interrupted at ");
   SerialUSB.print(stopposition);
   SerialUSB.print("(Instruction No. ");
@@ -2266,6 +2346,7 @@ void KeyEMPressed()
 
 void Move(long micro_delay)
 {
+  long delaytime=micro_delay+100;
   digitalWrite(X_ENABLE_PIN, LOW);
   digitalWrite(Y_ENABLE_PIN, LOW);
   digitalWrite(Z_ENABLE_PIN, LOW);
@@ -2287,12 +2368,22 @@ void Move(long micro_delay)
   TestE = true;
   unsigned int movecmd = 0;
   long time = micros();
+  long delay_counter=1;
+  long steps_sum=-(current_steps.x-target_steps.x)*x_direction-(current_steps.y-target_steps.y)*y_direction-(current_steps.z-target_steps.z)*z_direction;
+  long all_steps=steps_sum;
   do
   {
+    long start = micros();
+    
+    steps_sum=-(current_steps.x-target_steps.x)*x_direction-(current_steps.y-target_steps.y)*y_direction-(current_steps.z-target_steps.z)*z_direction;
+    if (steps_sum>(all_steps-100))
+    delaytime-=delay_counter;
+    if (steps_sum<100)
+    delaytime+=delay_counter;
+    
     PIOD->PIO_OWER = 0x0F;
     PIOD->PIO_OWDR = 0xFFFFFFF0;
     PIOD->PIO_ODSR = 0;
-    long start = micros();
     movecmd = 0;
     TestX = (current_steps.x != target_steps.x) && (TestXMAXPos || (!x_direction)) && (TestXMINPos || (x_direction));
     TestY = (current_steps.y != target_steps.y) && (TestYMAXPos || (!y_direction)) && (TestYMINPos || (y_direction));
@@ -2344,8 +2435,14 @@ void Move(long micro_delay)
     PIOD->PIO_OWER = 0x0F;
     PIOD->PIO_OWDR = 0xFFFFFFF0;
     PIOD->PIO_ODSR = movecmd;
-    delayMicroseconds(micro_delay - (micros() - start));
-    yield();
+    long startt =micros();
+    long us=delaytime-(micros()-start);
+   while ((micros() - startt) < us) {
+      }
+startt =micros();
+   yield();
+  SerialUSB.println(micros()-startt); 
+      
   }
   while (TestX || TestY || TestZ || TestE);
   current.x = current_steps.x / x_unit;
