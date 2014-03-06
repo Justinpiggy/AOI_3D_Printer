@@ -7,7 +7,7 @@
 
 
 #define PAGE_0_MAX 5
-#define PAGE_1_MAX 9
+#define PAGE_1_MAX 2
 #define LCD_INTERVAL 500
 #define BUFFER_SIZE 100
 
@@ -98,15 +98,10 @@ struct datastr {
   long start;
 };
 
-int Add(int d);
+void Add(int d);
 void Sub(int d);
 int MoveL(int d);
 int MoveR(int d);
-
-int LAdd(int d);
-void LSub(int d);
-int LMoveL(int d);
-int LMoveR(int d);
 
 
 void ShowProgress(int x, int y, int bar_len, double progress);
@@ -132,8 +127,6 @@ FloatPt delta;
 LongPt current_steps;
 LongPt target_steps;
 LongPt delta_steps;
-
-FloatPt resume;
 
 datastr membuffer[2][BUFFER_SIZE];
 
@@ -289,8 +282,8 @@ int refresh = -1;
 
 boolean KeyU, KeyD, KeyR, KeyL, KeyOK, KeyB;
 
-char menu0[PAGE_0_MAX][20] = {"Print", "Resume Printing", "SD Info", "SD Refresh", "About"};
-char menu1[PAGE_1_MAX][20] = {"Select File", "Set File Offset","Set X-axis","Set Y-axis","Set Z-axis","Set E-pos","Set Bed Temp","Set Extruder Temp","Set Fan Speed"};
+char menu0[PAGE_0_MAX][20] = {"ABC", "DEF", "GHI", "JKL", "MNO"};
+char menu1[PAGE_1_MAX][20] = {"PQR", "STU"};
 
 
 
@@ -345,7 +338,8 @@ void setup() {
   extruder_ctrl.SetOutputLimits(0, 255);
   extruder_ctrl.SetMode(AUTOMATIC);
 
-
+  extruder_input = (double) get_extruder_temp.read_temp();
+  SerialUSB.println(extruder_input);
   filename[0] = '1';
   filename[1] = '.';
   filename[2]='t';
@@ -387,14 +381,7 @@ void setup() {
   pinMode(E_STEP_PIN, OUTPUT);
   pinMode(E_DIR_PIN, OUTPUT);
   pinMode(E_ENABLE_PIN, OUTPUT);
-  
-  pinMode(KeyU_PIN,INPUT_PULLUP);
-  pinMode(KeyD_PIN,INPUT_PULLUP);
-  pinMode(KeyR_PIN,INPUT_PULLUP);
-  pinMode(KeyL_PIN,INPUT_PULLUP);
-  pinMode(KeyOK_PIN,INPUT_PULLUP);
-  pinMode(KeyB_PIN,INPUT_PULLUP);
-  pinMode(KeyEM_PIN,INPUT_PULLUP);
+
   CalDelta();
   feedrate = MAX_FEEDRATE;
   attachInterrupt(X_MAX_PIN, StopXMAX, FALLING);
@@ -418,13 +405,12 @@ void setup() {
   TestXMINPos = true;
   TestYMINPos = true;
   TestZMINPos = true;
-Scheduler.startLoop(SerialCLI);
+
   Scheduler.startLoop(TempControl);
   Scheduler.startLoop(SerialUSBReport);
-  Scheduler.startLoop(SDtoMEM);
   Scheduler.startLoop(Print);
-  
-  
+  Scheduler.startLoop(SDtoMEM);
+  Scheduler.startLoop(SerialCLI);
   Scheduler.startLoop(LCDTimer);
   Scheduler.startLoop(LCDUpdate);
 
@@ -435,23 +421,21 @@ Scheduler.startLoop(SerialCLI);
   LCD.clear();
   LCD.setCursor(0, 0);
   LCD.print("Waiting for SD card");
-  SerialUSB.println("WAITING FOR SD CARD");
+  SerialUSB.println("Waiting for SD card");
   if (!SD.begin(SD_CS_PIN)) {
-    SerialUSB.println("SD CARD NOT FOUND");
+    SerialUSB.println("SD card not found");
     LCD.setCursor(0, 1);
     LCD.print("SD card not found");
     IsSD = false;
   }
   else {
-    SerialUSB.println("SD CARD CONNECTED");
+    SerialUSB.println("SD card connected");
     LCD.setCursor(0, 1);
     LCD.print("SD card connected");
     IsSD = true;
   }
-  SerialUSB.print("SERIAL REPORT INTERVAL SET TO ");
-  SerialUSB.print(report_delay);
-  SerialUSB.println("s");
-  SerialUSB.println("'$'--COMMAND\n'P'--START PRINTING\n'R'--RESUME\n'S'--STOP\n'F'--FILE\n'I'--REPORT INTERVAL\n'O'--FILE OFFSET\n'L'--LIST SD\n'W'--WRITE TO FILE\n");
+  SerialUSB.println("SERIAL REPORT INTERVAL SET TO 10s");
+  SerialUSB.println("$ FOR COMMAND / 1 FOR START / 2 FOR SET FILE PATH / R FOR SET REPORT INTERVAL");
 
 
 
@@ -646,7 +630,7 @@ void loop() {
         if (KeyR)
         {
           int select = firstrow + CursorR;
-          page = select + 20;
+          page = select + 1;
           firstrow = 0;
           CursorR = 0;
           ClearKey();
@@ -663,7 +647,7 @@ void loop() {
         if (KeyOK)
         {
           int select = firstrow + CursorR;
-          page = select + 20;
+          page = select + 1;
           firstrow = 0;
           CursorR = 0;
           ClearKey();
@@ -803,7 +787,141 @@ void loop() {
         }
       }
       break;
-        
+
+
+    case 6://Resume Print select file
+      {
+        if (KeyU)
+        {
+          if (firstrow > 0)
+          {
+            if (CursorR == 0)
+            {
+              firstrow--;
+              update = true;
+            }
+            else
+            {
+              CursorR--;
+              update = true;
+            }
+          }
+          ClearKey();
+        }
+        if (KeyD)
+        {
+          if (firstrow != PAGE_0_MAX - 3)
+          {
+            if (CursorR == 3)
+            {
+              firstrow++;
+              update = true;
+            }
+            else
+            {
+              CursorR++;
+              update = true;
+            }
+          }
+          ClearKey();
+        }
+        if (KeyR)
+        {
+          int select = firstrow + CursorR;
+          page = select + 1;
+          firstrow = 0;
+          CursorR = 0;
+          ClearKey();
+          update = true;
+        }
+        if (KeyL)
+        {
+          firstrow = 0;
+          CursorR = 0;
+          page = 2;
+          update = true;
+          ClearKey();
+        }
+        if (KeyOK)
+        {
+          int select = firstrow + CursorR;
+          page = 8;
+          firstrow = 0;
+          CursorR = 0;
+          ClearKey();
+          SerialUSB.print("Set file path to: ");
+          for (n = 0; list[select][n] != '\0'; n++)
+          {
+            filename[n] = list[select][n];
+            SerialUSB.print(filename[n]);
+          }
+          filename[n] = '\0';
+          SerialUSB.println();
+          page = 7;
+          update = true;
+
+        }
+      }
+      if (KeyB)
+      {
+        firstrow = 0;
+        CursorR = 0;
+        page = 2;
+        update = true;
+        ClearKey();
+      }
+      break;
+
+    case 7://Resume Print select point
+      {
+        if (KeyU)
+        {
+          Add(digit);
+          ClearKey();
+        }
+        if (KeyD)
+        {
+          Sub(digit);
+          ClearKey();
+        }
+        if (KeyR)
+        {
+          digit = MoveR(digit);
+          ClearKey();
+        }
+        if (KeyL)
+        {
+          digit = MoveL(digit);
+          ClearKey();
+        }
+        if (KeyOK)
+        {
+          //set position
+          fileposition = 0;
+          for (n = 0; n < 9; n++)
+          {
+            fileposition += P[n] * Dec[n];
+          }
+          if (fileposition <= filesize)
+          {
+            buffer_switch = 1;
+            update = true;
+          }
+          else
+          {
+            fileposition = 0;
+          }
+          ClearKey();
+        }
+        if (KeyB)
+        {
+          page = 2;
+          update = true;
+          ClearKey();
+        }
+      }
+      break;
+
     case 8://Now printing
       {
         if (KeyU)
@@ -994,554 +1112,6 @@ void loop() {
         }
       }
       break;
-      
-      
-    case 20://Resume Print select file
-      {
-        if (KeyU)
-        {
-          if (firstrow > 0)
-          {
-            if (CursorR == 0)
-            {
-              firstrow--;
-              update = true;
-            }
-            else
-            {
-              CursorR--;
-              update = true;
-            }
-          }
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          if (firstrow != PAGE_0_MAX - 3)
-          {
-            if (CursorR == 3)
-            {
-              firstrow++;
-              update = true;
-            }
-            else
-            {
-              CursorR++;
-              update = true;
-            }
-          }
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          int select = firstrow + CursorR;
-          page = select + 1;
-          firstrow = 0;
-          CursorR = 0;
-          ClearKey();
-          update = true;
-        }
-        if (KeyL)
-        {
-          firstrow = 0;
-          CursorR = 0;
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          int select = firstrow + CursorR;
-          page = 8;
-          firstrow = 0;
-          CursorR = 0;
-          ClearKey();
-          SerialUSB.print("Set file path to: ");
-          for (n = 0; list[select][n] != '\0'; n++)
-          {
-            filename[n] = list[select][n];
-            SerialUSB.print(filename[n]);
-          }
-          filename[n] = '\0';
-          SerialUSB.println();
-          page = 7;
-          update = true;
-
-        }
-      }
-      if (KeyB)
-      {
-        firstrow = 0;
-        CursorR = 0;
-        page = 2;
-        update = true;
-        ClearKey();
-      }
-      break;
-
-    case 21://Resume Print select point
-      
-      {
-        if (KeyU)
-        {
-          LAdd(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          LSub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = LMoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = LMoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          //set position
-          fileposition = 0;
-          for (n = 0; n < 9; n++)
-          {
-            fileposition += P[n] * Dec[n];
-          }
-          if (fileposition <= filesize)
-          {
-            page++;
-            for(n=0;n<9;n++)
-            P[n]=0;
-            update = true;
-          }
-          else
-          {
-            fileposition = 0;
-          }
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      break;
-      
-      case 22://Resume Print select X
-      
-      {
-        if (KeyU)
-        {
-          Add(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          Sub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = MoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = MoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          resume.x=0;
-          for (n = 0; n < 5; n++)
-          {
-            resume.x += P[n] * Dec[n];
-          }
-          resume.x/=100000;
-          for (n = 0; n < 5; n++)
-          {
-            resume.x += P[n+5] * Dec[n];
-          }
-          for(n=0;n<9;n++)
-          P[n]=0;
-          page++;
-          update=true;
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      
-      
-      break;
-      
-      case 23://Resume Print select Y
-      {
-        if (KeyU)
-        {
-          Add(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          Sub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = MoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = MoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          resume.y=0;
-          for (n = 0; n < 5; n++)
-          {
-            resume.y += P[n] * Dec[n];
-          }
-          resume.y/=100000;
-          for (n = 0; n < 5; n++)
-          {
-            resume.y += P[n+5] * Dec[n];
-          }
-          for(n=0;n<9;n++)
-          P[n]=0;
-          page++;
-          update=true;
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      break;
-      
-      case 24://Resume Print select Z
-      {
-        if (KeyU)
-        {
-          Add(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          Sub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = MoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = MoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          resume.z=0;
-          for (n = 0; n < 5; n++)
-          {
-            resume.z += P[n] * Dec[n];
-          }
-          resume.z/=100000;
-          for (n = 0; n < 5; n++)
-          {
-            resume.z += P[n+5] * Dec[n];
-          }
-          for(n=0;n<9;n++)
-          P[n]=0;
-          page++;
-          update=true;
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      break;
-      
-      
-      
-      case 25://Resume Print select E
-      {
-        if (KeyU)
-        {
-          Add(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          Sub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = MoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = MoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          resume.x=0;
-          for (n = 0; n < 5; n++)
-          {
-            resume.e += P[n] * Dec[n];
-          }
-          resume.e/=100000;
-          for (n = 0; n < 5; n++)
-          {
-            resume.e += P[n+5] * Dec[n];
-          }
-          for(n=0;n<9;n++)
-          P[n]=0;
-          page++;
-          update=true;
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      break;
-
-case 26://Resume Print select F
-      {
-        if (KeyU)
-        {
-          Add(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          Sub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = MoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = MoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          feedrate=0;
-          for (n = 0; n < 5; n++)
-          {
-            feedrate += P[n] * Dec[n];
-          }
-          feedrate/=100000;
-          for (n = 0; n < 5; n++)
-          {
-            feedrate += P[n+5] * Dec[n];
-          }
-          for(n=0;n<9;n++)
-          P[n]=0;
-          page++;
-          update=true;
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      break;
-      
-      case 27://Resume Print select B bed
-      {
-        if (KeyU)
-        {
-          Add(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          Sub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = MoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = MoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          bed_temp=0;
-          for (n = 0; n < 5; n++)
-          {
-            bed_temp += P[n] * Dec[n];
-          }
-          bed_temp/=100000;
-          for (n = 0; n < 5; n++)
-          {
-            bed_temp += P[n+5] * Dec[n];
-          }
-          for(n=0;n<9;n++)
-          P[n]=0;
-          page++;
-          update=true;
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      break;
-      
-      case 28://Resume Print select H extruder
-      {
-        if (KeyU)
-        {
-          Add(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          Sub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = MoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = MoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          extruder_temp=0;
-          for (n = 0; n < 5; n++)
-          {
-            extruder_temp += P[n] * Dec[n];
-          }
-          extruder_temp/=100000;
-          for (n = 0; n < 5; n++)
-          {
-            extruder_temp += P[n+5] * Dec[n];
-          }
-          for(n=0;n<9;n++)
-          P[n]=0;
-          page++;
-          update=true;
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      break;
-      
-      case 29://Resume Print select C fan_speed
-      {
-        if (KeyU)
-        {
-          LAdd(digit);
-          ClearKey();
-        }
-        if (KeyD)
-        {
-          LSub(digit);
-          ClearKey();
-        }
-        if (KeyR)
-        {
-          digit = LMoveR(digit);
-          ClearKey();
-        }
-        if (KeyL)
-        {
-          digit = LMoveL(digit);
-          ClearKey();
-        }
-        if (KeyOK)
-        {
-          fan_speed = 0;
-          for (n = 0; n < 9; n++)
-          {
-            fan_speed += P[n] * Dec[n];
-          }
-          if (fan_speed <= 255)
-          {
-            
-            
-            //RESUME PRINTING
-            page++;
-            for(n=0;n<9;n++)
-            P[n]=0;
-            update = true;
-          }
-          else
-          {
-            fan_speed=0;
-            update = true;
-          }
-          for(n=0;n<9;n++)
-          P[n]=0;
-          update=true;
-          ClearKey();
-        }
-        if (KeyB)
-        {
-          page = 2;
-          update = true;
-          ClearKey();
-        }
-      }
-      break;
-    
-      default:
-       {
-       }
-       break;
   }
   yield();
 }
@@ -1550,6 +1120,7 @@ void LCDUpdate()
 {
   if (update)
   {
+    SerialUSB.println("LCD Updated");
     analogWrite(LCD_LED_PIN, brightness);
     LCD.clear();
     switch (page) {
@@ -1628,6 +1199,39 @@ void LCDUpdate()
         }
         break;
 
+      case 6://Resume Print select file
+        {
+          refresh = -1;
+          LCD.setCursor(0, CursorR);
+          LCD.write(1);
+          for (n = firstrow; n < firstrow + 4; n++)
+          {
+            LCD.setCursor(n - firstrow, 1);
+            LCD.print(list[n - firstrow]);
+          }
+        }
+        break;
+
+      case 7://Resume Print select point
+        {
+          refresh = -1;
+          LCD.setCursor(0, 0);
+          LCD.print("Set Resume Position");
+          LCD.setCursor(5, 1);
+          for (n = 0; n < 10; n++)
+          {
+            P[n] = fileposition - fileposition / 10;
+            fileposition = fileposition / 10;
+          }
+          for (n = 0; n < 10; n--)
+          {
+            LCD.print(P[9 - n]);
+          }
+          LCD.setCursor(14, 2);
+          digit = 0;
+          LCD.write(3);
+        }
+        break;
 
       case 8://Now printing
         {
@@ -1694,253 +1298,9 @@ void LCDUpdate()
           LCD.print("Press any key to exit");
         }
         break;
-        
-        case 20://Resume Print select file
-        {
-          refresh = -1;
-          LCD.setCursor(0, CursorR);
-          LCD.write(1);
-          for (n = firstrow; n < firstrow + 4; n++)
-          {
-            LCD.setCursor(n - firstrow, 1);
-            LCD.print(list[n - firstrow]);
-          }
-        }
-        break;
-
-      case 21://Resume Print select point
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set File Position");
-          LCD.setCursor(5, 1);
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = fileposition - fileposition / 10;
-            fileposition = fileposition / 10;
-          }
-          for (n = 0; n < 10; n--)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        
-        case 22://Resume Print select X
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set X Position");
-          LCD.setCursor(5, 1);
-          long ltemp=resume.x*100000;
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = ltemp- ltemp / 10;
-            ltemp = ltemp / 10;
-          }
-          for (n = 0; n < 5; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.print('.');
-          for (n = 4; n < 9; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        
-        case 23://Resume Print select Y
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set Y Position");
-          LCD.setCursor(5, 1);
-          long ltemp=resume.x*100000;
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = ltemp- ltemp / 10;
-            ltemp = ltemp / 10;
-          }
-          for (n = 0; n < 5; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.print('.');
-          for (n = 4; n < 9; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        
-        case 24://Resume Print select Z
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set Z Position");
-          LCD.setCursor(5, 1);
-          long ltemp=resume.x*100000;
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = ltemp- ltemp / 10;
-            ltemp = ltemp / 10;
-          }
-          for (n = 0; n < 5; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.print('.');
-          for (n = 4; n < 9; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        
-        case 25://Resume Print select E
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set E Position");
-          LCD.setCursor(5, 1);
-          long ltemp=resume.x*100000;
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = ltemp- ltemp / 10;
-            ltemp = ltemp / 10;
-          }
-          for (n = 0; n < 5; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.print('.');
-          for (n = 4; n < 9; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        case 26://Resume Print select F
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set Feedrate");
-          LCD.setCursor(5, 1);
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = feedrate - feedrate / 10;
-            feedrate = feedrate / 10;
-          }
-          for (n = 0; n < 10; n--)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        
-        case 27://Resume Print select B
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set Bed Temp");
-          LCD.setCursor(5, 1);
-          long ltemp=resume.x*100000;
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = ltemp- ltemp / 10;
-            ltemp = ltemp / 10;
-          }
-          for (n = 0; n < 5; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.print('.');
-          for (n = 4; n < 9; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        
-        case 28://Resume Print select H
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set X Position");
-          LCD.setCursor(5, 1);
-          long ltemp=resume.x*100000;
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = ltemp- ltemp / 10;
-            ltemp = ltemp / 10;
-          }
-          for (n = 0; n < 5; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.print('.');
-          for (n = 4; n < 9; n++)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        
-        case 29://Resume Print select C
-        {
-          refresh = -1;
-          LCD.setCursor(0, 0);
-          LCD.print("Set Fan Speed");
-          LCD.setCursor(5, 1);
-          for (n = 0; n < 10; n++)
-          {
-            P[n] = fan_speed - fan_speed / 10;
-            fan_speed = fan_speed / 10;
-          }
-          for (n = 0; n < 10; n--)
-          {
-            LCD.print(P[9 - n]);
-          }
-          LCD.setCursor(14, 2);
-          digit = 0;
-          LCD.write(3);
-        }
-        break;
-        
-        
-        default:
-       {
-       }
-       break;
     }
-    
+    update=false;
   }
-  update=false;
   yield();
 }
 
@@ -1988,10 +1348,6 @@ void LCDTimer() {
           LCD.print(stemp);
         }
         break;
-       default:
-       {
-       }
-       break;
     }
     long LCDs = millis();
     while (millis() - LCDs < 500)
@@ -2024,7 +1380,7 @@ void SerialCLI() {
       case '0' :
         break;
 
-      case 'P' :
+      case '1' :
         SerialUSB.print("Printing File: ");
         for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
         {
@@ -2050,7 +1406,7 @@ void SerialCLI() {
         buffer_switch = 1;
         break;
 
-      case 'F' :
+      case '2' :
         SerialUSB.print("File path set to: ");
         for (n = 0; ((n < i - 1)&&(data[n]!='\r')&&(data[n]!='\n')); n++)
         {
@@ -2064,7 +1420,7 @@ void SerialCLI() {
 
         break;
 
-      case 'W' :
+      case '3' :
         dataFile = SD.open(filename, FILE_WRITE);
         if (dataFile) {
           dataFile.seek(fileposition);
@@ -2078,102 +1434,46 @@ void SerialCLI() {
           SerialUSB.println("ERROR: Cannot open the file");
         }
         break;
-      case 'R' :
+      case '4' :
         {
-          double resume_e = strtod(data, NULL);
-          command_switch=1;
-          Decode("G0 X-100 Y-100 Z300", 18);
-          command_switch=1;
-          Decode("G0 Z-100", 9);
-          SETtarget(0,0,0,0);
-          SETposition(0,0,0,0);
-          command_switch=1;
-          Decode("G0 X280 Y280 Z280", 18);
-          if (FindData('X', data, i-1) != 32767)
-          {
-              target.x = FindData('X', data, i-1);
-          }
-            if (FindData('Y', data, i-1) != 32767)
-            {
-              target.y = FindData('Y', data, i-1);
-            }
-            if (FindData('Z', data,i-1) != 32767)
-            {
-              target.z = FindData('Z', data, i-1);
-            }
-            if (FindData('E', data, i-1) != 32767)
-            {
-              target.e = FindData('E', data, i-1);
-              current.e=target.e;
-            }
-            if (FindData('F', data, i-1) != 32767)
-            {
-            feedrate = FindData('F', data,i-1);
-            }
-            if (FindData('B', data, i-1) != 32767)
-            {
-            bed_temp = FindData('B', data,i-1);
-            if (bed_temp==0)
-            bed_pwr=0;
-            else bed_pwr=1;
-            }
-            if (FindData('H', data, i-1) != 32767)
-            {
-            extruder_temp = FindData('H', data,i-1);
-            if (extruder_temp==0)
-            extruder_pwr=0;
-            else {
-              extruder_pwr=1;
-              SerialUSB.println("Preheating Extruder");
-              while(!extruder_ok)
-              {
-                yield();
-              }
-            }
-            }
-            if (FindData('C', data, i-1) != 32767)
-            {
-            fan_speed = FindData('C', data,i-1);
-            analogWrite(FAN_PIN,fan_speed);
-            }
-            CalDelta();
-            Move(60000000 / x_unit / MAX_FEEDRATE);
+          long resume_position = strtod(data, NULL);
           dataFile = SD.open(filename);
           if (dataFile)
           {
-            if (fileposition < dataFile.size())
+            if (resume_position < dataFile.size())
             {
+              fileposition = resume_position;
               SerialUSB.print("Resume printing process from ");
-              SerialUSB.print(fileposition);
+              SerialUSB.print(resume_position);
               SerialUSB.print(" at the file ");
               for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
               {
                 SerialUSB.print(filename[n]);
               }
               SerialUSB.println();
-              
-              dataFile.close();
+              Decode("G0 X300 Y300 Z300", 18);
               buffer_switch = 1;
             }
             else {
               SerialUSB.println("ERROR: Resume position exceeds file size");
             }
-            
+            dataFile.close();
           }
           else {
             SerialUSB.println("ERROR: Cannot open the file");
           }
         }
         break;
-      case 'O' :
+      case '5' :
       {
         char strtemp[100];
         for (n = 0; n < i - 1; n++)
         {
           strtemp[n] = data[n];
+          SerialUSB.print(data[n]);
         }
         fileposition=atoi(strtemp);
-        SerialUSB.print("Set file offset to ");
+        SerialUSB.println();
         SerialUSB.println(fileposition);
       }
       break;
@@ -2190,35 +1490,24 @@ void SerialCLI() {
         command_switch=0;
         SerialUSB.println("DONE");
         break;
-      case 'I' :
+      case 'R' :
         SerialUSB.print("Report Interval= ");
         report_delay = strtod(data, NULL);
         SerialUSB.print(report_delay);
         SerialUSB.println(" s");
         break;
-      case 'L' :
-      {
-        SerialUSB.println("SD Card root directory:");
-        filemax=ListSD();
-        for(int fc=0;fc<filemax;fc++)
-        SerialUSB.println(list[fc]);
-      }
-      break;
-      case 'H' :
-      {
-        SerialUSB.println("HELP MENU");
-        SerialUSB.println("'$'--COMMAND\n'P'--START PRINTING\n'R'--RESUME\n'S'--STOP\n'F'--FILE\n'I'--REPORT INTERVAL\n'O'--FILE OFFSET\n'L'--LIST SD\n'W'--WRITE TO FILE\n");
-}
-      break;
+
       case 'S' :
         {
-          
+          bed_pwr = 0;
+          digitalWrite(BED_PIN, LOW);
+          extruder_pwr = 0;
+          digitalWrite(EXTRUDER_PIN, LOW);
+          fan_speed = 0;
+          digitalWrite(FAN_PIN, LOW);
           buffer_switch = 0;
           print_switch=0;
           buffer_switch=0;
-          command_switch=0;
-          yield();
-          dataFile.close();
           long stopposition = membuffer[buffernum][printi].start; 
   long stopline =bufferstartposition[buffernum] + printi;
           SerialUSB.print("Printing process is interrupted at ");
@@ -2230,36 +1519,9 @@ void SerialCLI() {
           {
             SerialUSB.print(filename[n]);
           }
-          SerialUSB.println("'");
-          
-          SerialUSB.print("Resume Argument: ");
-          SerialUSB.print("'X");
-          SerialUSB.print(current.x);
-          SerialUSB.print(" Y");
-          SerialUSB.print(current.y);
-          SerialUSB.print(" Z");
-          SerialUSB.print(current.z);
-          SerialUSB.print(" E");
-          SerialUSB.print(current.e);
-          SerialUSB.print(" F");
-          SerialUSB.print(feedrate);
-          SerialUSB.print(" B");
-          SerialUSB.print(bed_temp);
-           SerialUSB.print(" H");
-          SerialUSB.print(extruder_temp);
-           SerialUSB.print(" C");
-          SerialUSB.print(fan_speed);
-          SerialUSB.println("'");
-          bed_pwr = 0;
-          digitalWrite(BED_PIN, LOW);
-          extruder_pwr = 0;
-          digitalWrite(EXTRUDER_PIN, LOW);
-          fan_speed = 0;
-          digitalWrite(FAN_PIN, LOW);
           page = 10;
           update = true;
-          
-          
+          SerialUSB.println("'");
         }
         break;
     }
@@ -2451,7 +1713,7 @@ void SDtoMEM()
       
       
       
-      while ((buffer_switch == 1)&&fileposition < filesize) {
+      while (fileposition < filesize) {
         int bufferposition = 0;
         bufferstartposition[1 - buffernum] = bufferstartposition[buffernum]+BUFFER_SIZE;
        // ch = dataFile.read();
@@ -2485,11 +1747,10 @@ void SDtoMEM()
           fileposition++;
         }
         bufferlength[1 - buffernum] = bufferposition;
-        while ((print_switch == 1)&&(buffer_switch==1))
+        while (print_switch == 1)
         {
         yield();
         }
-        SerialUSB.println("Switch Buffer");
         if(buffer_switch==1)
       print_switch=1;
       }
@@ -2507,70 +1768,62 @@ void SDtoMEM()
   yield();
 }
 
-int Add(int d)
+void Add(int d)
 {
   if (P[d] < 9) {
-    if(d<5)
     LCD.setCursor(14 - d, 1);
-    else
-    LCD.setCursor(13 - d, 1);
-    if ((d == 9) && P[9] == 9) {
-      return -1;
+    if ((d == 9) && P[9] == 4) {
+      return;
     }
     P[d]++;
     LCD.print(P[d]);
-    return 1;
   }
   else {
-    if(d<5)
+    if ((P[9] == 4) && (((P[d - 1] == 9) && (d != 8)) || ((d == 8) && (P[8] == 9)))) {
+      return;
+    }
     LCD.setCursor(14 - d, 1);
-    else
-    LCD.setCursor(13 - d, 1);
-    if(Add(n+1)>0)
     P[d] = 0;
     LCD.print(P[d]);
-    return 1;
+    Add(n - 1);
   }
 }
 
 void Sub(int d)
 {
-    if (P[n] > 0) {
-        if(d<5)
-    LCD.setCursor(14 - d, 1);
-    else
-    LCD.setCursor(13 - d, 1);
+  for (n = 9; (n >= 0) && (n >= d); n--) {
+    if (P[n] != 0) {
+      if (P[d] > 0) {
+        LCD.setCursor(14 - d, 1);
         P[d]--;
         LCD.print(P[d]);
       }
+      else {
+        LCD.setCursor(14 - d, 1);
+        P[d] = 9;
+        LCD.print(P[d]);
+        Sub(d);
+
+      }
+      break;
+    }
+  }
 }
 
 int MoveR(int d)
 {
   if (d != 0) {
-    if(d<5)
     LCD.setCursor(14 - d, 2);
-    else
-    LCD.setCursor(13 - d, 2);
     LCD.print(" ");
     d--;
-    if(d<5)
     LCD.setCursor(14 - d, 2);
-    else
-    LCD.setCursor(13 - d, 2);
     LCD.write(3);
   }
   else {
-    if(d<5)
     LCD.setCursor(14 - d, 2);
-    else
-    LCD.setCursor(13 - d, 2);
     LCD.print(" ");
     d = 9;
-    if(d<5)
     LCD.setCursor(14 - d, 2);
-    else
-    LCD.setCursor(13 - d, 2);
     LCD.write(3);
   }
   return d;
@@ -2579,88 +1832,6 @@ int MoveR(int d)
 int MoveL(int d)
 {
   if (d != 9) {
-    if(d<5)
-    LCD.setCursor(14 - d, 2);
-    else
-    LCD.setCursor(13 - d, 2);
-    LCD.print(" ");
-    d++;
-    if(d<5)
-    LCD.setCursor(14 - d, 2);
-    else
-    LCD.setCursor(13 - d, 2);
-    LCD.write(3);
-  }
-  else {
-    if(d<5)
-    LCD.setCursor(14 - d, 2);
-    else
-    LCD.setCursor(13 - d, 2);
-    LCD.print(" ");
-    d = 0;
-    if(d<5)
-    LCD.setCursor(14 - d, 2);
-    else
-    LCD.setCursor(13 - d, 2);
-    LCD.write(3);
-  }
-  return d;
-}
-
-
-
-
-int LAdd(int d)
-{
-  if (P[d] < 9) {
-    LCD.setCursor(14 - d, 1);
-    if ((d == 9) && P[9] == 9) {
-      return -1;
-    }
-    P[d]++;
-    LCD.print(P[d]);
-    return 1;
-  }
-  else {
-    LCD.setCursor(14 - d, 1);
-    if(Add(n+1)>0)
-    P[d] = 0;
-    LCD.print(P[d]);
-    return 1;
-  }
-}
-
-void LSub(int d)
-{
-    if (P[n] > 0) {
-    LCD.setCursor(14 - d, 1);
-        P[d]--;
-        LCD.print(P[d]);
-      }
-}
-
-int LMoveR(int d)
-{
-  if (d != 0) {
-    LCD.setCursor(14 - d, 2);
-    LCD.print(" ");
-    d--;
-    LCD.setCursor(14 - d, 2);
-    LCD.write(3);
-  }
-  else {
-    LCD.setCursor(14 - d, 2);
-    LCD.print(" ");
-    d = 9;
-    LCD.setCursor(14 - d, 2);
-    LCD.write(3);
-  }
-  return d;
-}
-
-int LMoveL(int d)
-{
-  if (d != 9) {
     LCD.setCursor(14 - d, 2);
     LCD.print(" ");
     d++;
@@ -2676,6 +1847,9 @@ int LMoveL(int d)
   }
   return d;
 }
+
+
+
 
 
 void ShowProgress(int x, int y, int barlen, double progress)
@@ -2727,6 +1901,7 @@ void ClearKey()
 void Decode(char instruction[], int length)
 {
   decoding=true;
+  SerialUSB.println("Decode");
   SerialUSB.println(instruction);
   if (instruction[0] == ';')
     return;
@@ -2782,20 +1957,21 @@ void Decode(char instruction[], int length)
           }
           else
             feedrate_micros = 60000000 / x_unit / MAX_FEEDRATE;
+            SerialUSB.print("Move");
+            SerialUSB.println(feedrate_micros);
            Move(feedrate_micros);
-           if(buffer_switch==1)
-           {
-          SerialUSB.print("X ");
-          SerialUSB.print(current.x);
-          SerialUSB.print(" |Y ");
-          SerialUSB.print(current.y);
-          SerialUSB.print(" |Z ");
-          SerialUSB.print(current.z);
-          SerialUSB.print(" |E ");
-          SerialUSB.print(current.e);
-          SerialUSB.print(" |F ");
+
+          SerialUSB.print("X Axis=");
+          SerialUSB.println(current.x);
+          SerialUSB.print("Y Axis=");
+          SerialUSB.println(current.y);
+          SerialUSB.print("Z Axis=");
+          SerialUSB.println(current.z);
+          SerialUSB.print("Extruder=");
+          SerialUSB.println(current.e);
+          SerialUSB.print("Feedrate=");
           SerialUSB.println(feedrate);
-           }
+         
     
         }
         break;
@@ -2846,20 +2022,20 @@ void Decode(char instruction[], int length)
           else
             feedrate_micros = 60000000 / x_unit / MAX_FEEDRATE;
            
+ SerialUSB.print("Move");
+            SerialUSB.println(feedrate_micros);
             Move(feedrate_micros);
-          if(buffer_switch==1)
-           {
-          SerialUSB.print("X ");
-          SerialUSB.print(current.x);
-          SerialUSB.print(" |Y ");
-          SerialUSB.print(current.y);
-          SerialUSB.print(" |Z ");
-          SerialUSB.print(current.z);
-          SerialUSB.print(" |E ");
-          SerialUSB.print(current.e);
-          SerialUSB.print(" |F ");
+          SerialUSB.print("X Axis=");
+          SerialUSB.println(current.x);
+          SerialUSB.print("Y Axis=");
+          SerialUSB.println(current.y);
+          SerialUSB.print("Z Axis=");
+          SerialUSB.println(current.z);
+          SerialUSB.print("Extruder=");
+          SerialUSB.println(current.e);
+          SerialUSB.print("Feedrate=");
           SerialUSB.println(feedrate);
-           }
+         
 
         }
         break;
@@ -2925,7 +2101,7 @@ void Decode(char instruction[], int length)
           if (FindData('Z', instruction, length) != 32767)
             current.z = FindData('Z', instruction, length);
           if (FindData('E', instruction, length) != 32767)
-            current.e = FindData('F', instruction, length);
+            current.e = FindData('E', instruction, length);
         }
         break;
 
@@ -3031,7 +2207,6 @@ void Decode(char instruction[], int length)
         break;
     }
   }
-  command_switch=0;
   decoding=false;
 }
 
@@ -3368,6 +2543,11 @@ void Move(long micro_delay)
       
   }
   while ((TestX || TestY || TestZ || TestE)&&((print_switch == 1)||(command_switch==1)));
+  
+  SerialUSB.print(current_steps.x);
+     SerialUSB.print(current_steps.y);
+     SerialUSB.print(current_steps.z);
+      SerialUSB.println(current_steps.e);
   current.x = current_steps.x / x_unit;
   current.y = current_steps.y / y_unit;
   current.z = current_steps.z / z_unit;
