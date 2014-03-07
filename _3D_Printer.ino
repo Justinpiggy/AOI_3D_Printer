@@ -221,33 +221,41 @@ uint8_t Black[6][8] = {{
     B11111,
   }
 };
-
+//Stepper direction
 boolean x_direction = 1;
 boolean y_direction = 1;
 boolean z_direction = 1;
 boolean e_direction = 1;
-
+//Axes units
 double x_unit = X_STEPS_PER_MM;
 double y_unit = Y_STEPS_PER_MM;
 double z_unit = Z_STEPS_PER_MM;
 double e_unit = E_STEPS_PER_MM;
-
+//Test Register
 volatile boolean TestXMAXPos, TestYMAXPos, TestZMAXPos;
 volatile boolean TestXMINPos, TestYMINPos, TestZMINPos;
-
+//Feedrate calculation
 double feedrate = 0.0;
 long feedrate_micros = 0;
+//G-code absolute mode
 boolean abs_mode = true;
+//Accessory arguments
 byte extruder_pwr = 0;
 byte bed_pwr = 0;
 int fan_speed = 0;
 int extruder_temp = 0;
 int bed_temp = 0;
+//counters
 int num = 0;
-char c;
 int i = 0;
 int j = 0;
+int n = 0;
 int flag = 0;
+//SD driver arguments
+boolean IsSD = false;
+int filemax = 0;
+char list[100][20];
+//File system arguments
 File dataFile;
 char data[200];
 int datalength;
@@ -255,20 +263,21 @@ int datanum = 0;
 char filename[100];
 long filesize = 1;
 long fileposition = 0;
-int sta = 0;
+//Serial report arguments
 int report_delay = 0;
-int n = 0;
+//Service switches
 int print_switch = 0;
 int command_switch = 0;
+int buffer_switch = 0;
+//Ping-pong buffer arguments
 int bufferlength[2] = {0, 0};
 int bufferstartposition[2] = {0, 0};
 int buffernum = 0;
 int printi = 0;
-int buffer_switch = 0;
-int brightness = 200;
+//Status register
 boolean decoding = false;
 boolean extruder_ok = false;
-
+//Number selector
 long Dec[10] = {
   1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
 };
@@ -276,53 +285,58 @@ int digit = 0;
 int P[10] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-
-boolean IsSD = false;
-int filemax = 0;
-char list[100][20];
-
+//LCD menu stuff
 int page = 0;
 int firstrow = 0;
 int CursorR = 0;
 boolean update = false;
 int refresh = -1;
-
+int brightness = 200;
+//Keyboard status
 boolean KeyU, KeyD, KeyR, KeyL, KeyOK, KeyB;
-
+//Menu content
 char menu0[PAGE_0_MAX][20] = {"Print", "Resume Printing", "SD Info", "SD Refresh", "About"};
 char menu1[PAGE_1_MAX][20] = {"Select File", "Set File Offset", "Set X-axis", "Set Y-axis", "Set Z-axis", "Set E-pos", "Set Bed Temp", "Set Extruder Temp", "Set Fan Speed"};
-
-
-
+//Device instance
 MAX6675 get_extruder_temp(CS_E_PIN, SO_PIN, SCK_PIN, 1);
 MAX6675 get_bed_temp(CS_B_PIN, SO_PIN, SCK_PIN, 1);
 LiquidCrystal LCD(LCD_RS, LCD_EN, LCD_D0, LCD_D1, LCD_D2, LCD_D3, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
-
+PID bed_ctrl(&bed_input, &bed_output, &bed_set, bed_consKp, bed_consKi, bed_consKd, DIRECT);
+PID extruder_ctrl(&extruder_input, &extruder_output, &extruder_set, extruder_consKp, extruder_consKi, extruder_consKd, DIRECT);
+//Heating bed PID settings
 double bed_input, bed_output, bed_set;
 double bed_aggKp = 4, bed_aggKi = 0.2, bed_aggKd = 1.0;
 double bed_consKp = 1, bed_consKi = 0.05, bed_consKd = 0.25;
-
+//Extruder PID settings
 double extruder_input, extruder_output, extruder_set;
 double extruder_aggKp = 4, extruder_aggKi = 0.2, extruder_aggKd = 1.0;
 double extruder_consKp = 1, extruder_consKi = 0.05, extruder_consKd = 0.25;
 
-PID bed_ctrl(&bed_input, &bed_output, &bed_set, bed_consKp, bed_consKi, bed_consKd, DIRECT);
-PID extruder_ctrl(&extruder_input, &extruder_output, &extruder_set, extruder_consKp, extruder_consKi, extruder_consKd, DIRECT);
-
-
+//setup
 void setup() {
   SerialUSB.begin(115200);
+  //Waiting for Arduino Due SerialUSB
   while (!SerialUSB)
   {
   }
+  //Initialize filename
   for (n = 0; n < 100; n++)
   {
     filename[n] = 0;
   }
+  filename[0] = '1';
+  filename[1] = '.';
+  filename[2] = 't';
+  filename[3] = 'x';
+  filename[4] = 't';
+  filename[5] = 0;
+  filename[6] = 0;
+  //Initialize data
   for (n = 0; n < 200; n++)
   {
     data[n] = 0;
   }
+  //Initialize LCD
   LCD.begin(20, 4);
   LCD.createChar(1, ArrowR);
   LCD.createChar(2, ArrowL);
@@ -332,27 +346,19 @@ void setup() {
   LCD.print("AOI 3D Printer");
   LCD.setCursor(0, 1);
   LCD.print("Initializing...");
-
+  //Initialize accessory pins
   pinMode(FAN_PIN, OUTPUT);
   pinMode(BED_PIN, OUTPUT);
   pinMode(EXTRUDER_PIN, OUTPUT);
-
+  //Initialize PID arguments for heating bed
   bed_set = 100;
   bed_ctrl.SetOutputLimits(0, 255);
   bed_ctrl.SetMode(AUTOMATIC);
-
+  //Initialize PID arguments for extruder
   extruder_set = 100;
   extruder_ctrl.SetOutputLimits(0, 255);
   extruder_ctrl.SetMode(AUTOMATIC);
-
-
-  filename[0] = '1';
-  filename[1] = '.';
-  filename[2] = 't';
-  filename[3] = 'x';
-  filename[4] = 't';
-  filename[5] = 0;
-  filename[6] = 0;
+  //Initialize Steppers
   StopSteppers();
   current.x = 0.0;
   current.y = 0.0;
@@ -365,6 +371,7 @@ void setup() {
   z_unit = Z_STEPS_PER_MM;
   e_unit = E_STEPS_PER_MM;
   CalDelta();
+  //Pin direction declaration
   pinMode(13, OUTPUT);
   pinMode(X_STEP_PIN, OUTPUT);
   pinMode(X_DIR_PIN, OUTPUT);
@@ -395,8 +402,9 @@ void setup() {
   pinMode(KeyOK_PIN, INPUT_PULLUP);
   pinMode(KeyB_PIN, INPUT_PULLUP);
   pinMode(KeyEM_PIN, INPUT_PULLUP);
-  CalDelta();
+  //Initialize feedrate
   feedrate = MAX_FEEDRATE;
+  //Attaching interrupts
   attachInterrupt(X_MAX_PIN, StopXMAX, FALLING);
   attachInterrupt(X_MIN_PIN, StopXMIN, FALLING);
   attachInterrupt(Y_MAX_PIN, StopYMAX, FALLING);
@@ -411,23 +419,22 @@ void setup() {
   attachInterrupt(KeyOK_PIN, KeyOKPressed, FALLING);
   attachInterrupt(KeyB_PIN, KeyBPressed, FALLING);
   attachInterrupt(KeyEM_PIN, KeyEMPressed, FALLING);
-
+  
   TestXMAXPos = true;
   TestYMAXPos = true;
   TestZMAXPos = true;
   TestXMINPos = true;
   TestYMINPos = true;
   TestZMINPos = true;
+  //Starting tasks
   Scheduler.startLoop(SerialCLI);
   Scheduler.startLoop(TempControl);
   Scheduler.startLoop(SerialUSBReport);
   Scheduler.startLoop(SDtoMEM);
   Scheduler.startLoop(Print);
-
-
   Scheduler.startLoop(LCDTimer);
   Scheduler.startLoop(LCDUpdate);
-
+  //Serial report & LCD UI
   SerialUSB.println("SYSTEM INITIALIZED");
   LCD.setCursor(0, 2);
   LCD.print("System Initialized");
@@ -452,14 +459,11 @@ void setup() {
   SerialUSB.print(report_delay);
   SerialUSB.println("s");
   SerialUSB.println("'$'--COMMAND\n'P'--START PRINTING\n'R'--RESUME\n'S'--STOP\n'F'--FILE\n'I'--REPORT INTERVAL\n'O'--FILE OFFSET\n'L'--LIST SD\n'W'--WRITE TO FILE\n");
-
-
-
 }
 
 void loop() {
   switch (page) {
-    case 0:  // Main Menu | menu0
+    case 0:  // Main Menu
       {
         if (KeyU)
         {
@@ -2004,6 +2008,7 @@ void LCDTimer() {
 
 
 void SerialCLI() {
+  char c;
   while (SerialUSB.available()) {
     if (i == 0)
     {
@@ -2365,7 +2370,6 @@ void SerialUSBReport()
         SerialUSB.print(" ");
       }
     }
-
     SerialUSB.print("] ");
     SerialUSB.print(report * 100);
     SerialUSB.print("%\nFile position= ");
@@ -2449,15 +2453,9 @@ void SDtoMEM()
       buffernum = 0;
       if (buffer_switch == 1)
         print_switch = 1;
-
-
-
       while ((buffer_switch == 1) && fileposition < filesize) {
         int bufferposition = 0;
         bufferstartposition[1 - buffernum] = bufferstartposition[buffernum] + BUFFER_SIZE;
-        // ch = dataFile.read();
-        // SerialUSB.print(ch);
-        // fileposition++;
         while ((buffer_switch == 1) && (dataFile.available() > 0)  && (bufferposition < BUFFER_SIZE) && (fileposition < (filesize)))
         {
           j = 0;
@@ -2497,7 +2495,7 @@ void SDtoMEM()
           print_switch = 1;
       }
       dataFile.close();
-      SerialUSB.print("All Buffered.");
+      SerialUSB.print("All Buffered");
       page = 11;
       update = true;
 
