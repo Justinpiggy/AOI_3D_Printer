@@ -125,6 +125,7 @@ void CalDelta();
 void SETtarget(double x, double y, double z, double e);
 void SETposition(double x, double y, double z, double e);
 boolean TestKey(int KeyPin);
+void EM();
 
 FloatPt current;
 FloatPt target;
@@ -509,6 +510,7 @@ void loop() {
         }
         if (KeyR)
         {
+          filemax=ListSD();
           int select = firstrow + CursorR;
           page = select + 1;
           firstrow = 0;
@@ -522,6 +524,7 @@ void loop() {
         }
         if (KeyOK)
         {
+          filemax=ListSD();
           int select = firstrow + CursorR;
           page = select + 1;
           firstrow = 0;
@@ -647,7 +650,7 @@ void loop() {
           
             if (CursorR == 3)
             {
-              if (firstrow < PAGE_0_MAX - 4)
+              if (firstrow < PAGE_1_MAX - 4)
           {
               firstrow++;
               update = true;
@@ -1145,6 +1148,8 @@ void loop() {
         if (KeyB)
         {
           page = 2;
+          firstrow=0;
+          CursorR=0;
           update = true;
           ClearKey();
         }
@@ -1593,7 +1598,7 @@ void LCDUpdate()
         break;
       case 1:
         {
-          filemax=ListSD();
+         
           refresh = -1;
           LCD.setCursor(0, CursorR);
           LCD.write(1);
@@ -1720,6 +1725,7 @@ void LCDUpdate()
           LCD.print(stopline);
           LCD.setCursor(0, 3);
           LCD.print("Press any key to exit");
+          SerialUSB.println("Stopped");
         }
         break;
 
@@ -1738,7 +1744,7 @@ void LCDUpdate()
 
       case 20://Resume Print select file
         {
-          filemax=ListSD();
+          
           refresh = -1;
           LCD.setCursor(0, CursorR);
           LCD.write(1);
@@ -1748,7 +1754,7 @@ void LCDUpdate()
             LCD.print(list[n]);
             if (n == (CursorR + firstrow))
               SerialUSB.print(">");
-            SerialUSB.println(list[n - firstrow]);
+            SerialUSB.println(list[n]);
           }
         }
         break;
@@ -1764,10 +1770,12 @@ void LCDUpdate()
             P[n] = fileposition - fileposition / 10;
             fileposition = fileposition / 10;
           }
-          for (n = 0; n < 10; n--)
+          for (n = 10; n > 0; n--)
           {
             LCD.print(P[9 - n]);
+            SerialUSB.print(P[9-n]);
           }
+          SerialUSB.println();
           LCD.setCursor(14, 2);
           digit = 0;
           LCD.write(3);
@@ -1967,7 +1975,7 @@ void LCDUpdate()
             P[n] = fan_speed - fan_speed / 10;
             fan_speed = fan_speed / 10;
           }
-          for (n = 0; n < 10; n--)
+          for (n = 10; n > 0; n--)
           {
             LCD.print(P[9 - n]);
           }
@@ -2303,8 +2311,9 @@ void SerialCLI() {
           fan_speed = 0;
           digitalWrite(FAN_PIN, LOW);
           page = 10;
+          firstrow=0;
+          CursorR=0;
           update = true;
-
 
         }
         break;
@@ -2470,6 +2479,7 @@ void SDtoMEM()
           ch = dataFile.read();
           SerialUSB.print(ch);
         }
+        membuffer[1 - buffernum][bufferposition].st[j]=0;
         valid = j;
         if ((ch == ';'))
           while ((ch != '\n') && (fileposition < (filesize)))
@@ -2508,6 +2518,7 @@ void SDtoMEM()
             ch = dataFile.read();
             SerialUSB.print(ch);
           }
+          membuffer[1 - buffernum][bufferposition].st[j]=0;
           valid = j;
           if (ch == ';')
             while ((ch != '\n') && (fileposition < (filesize)) && (j < 180))
@@ -2733,10 +2744,12 @@ void ShowProgress(int x, int y, int barlen, double progress)
 
 int ListSD()
 {
+  SerialUSB.println("ListSD");
   dataFile.close();
   File root;
   int counter = 0;
   root = SD.open("/");
+  root.seek(0);
   while (true) {
     File entry =  root.openNextFile();
     if (! entry) {
@@ -2745,15 +2758,21 @@ int ListSD()
     if (entry.isDirectory()) {
     } else {
       n = 0;
+      SerialUSB.print(counter);
+      SerialUSB.print(" ");
       while ((entry.name()[n]) != '\0')
       {
         list[counter][n] = entry.name()[n];
+        SerialUSB.print(list[counter][n]);
         n++;
       }
+      SerialUSB.println();
       counter++;
     }
     entry.close();
   }
+  root.close();
+  SerialUSB.println("SD closed");
 }
 
 void ClearKey()
@@ -3326,7 +3345,13 @@ void KeyEMPressed()
   if (TestKey(KeyEM_PIN))
   {
     SerialUSB.println("KeyEM");
-    buffer_switch = 0;
+    EM();
+  }
+}
+
+void EM()
+{
+  buffer_switch = 0;
           print_switch = 0;
           buffer_switch = 0;
           command_switch = 0;
@@ -3370,9 +3395,12 @@ void KeyEMPressed()
           fan_speed = 0;
           digitalWrite(FAN_PIN, LOW);
           page = 10;
+          firstrow=0;
+          CursorR=0;
+          fileposition=0;
           update = true;
           refresh = -1;
-  }
+          ClearKey();
 }
 
 
