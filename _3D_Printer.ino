@@ -472,36 +472,39 @@ void loop() {
       {
         if (KeyU)
         {
-          if (firstrow > 0)
+
+          if (CursorR == 0)
           {
-            if (CursorR == 0)
+            if (firstrow > 0)
             {
               firstrow--;
               update = true;
             }
-            else
-            {
-              CursorR--;
-              update = true;
-            }
+          }
+          else
+          {
+            CursorR--;
+            update = true;
           }
           ClearKey();
         }
         if (KeyD)
         {
-          if (firstrow != PAGE_0_MAX - 3)
-          {
+         
             if (CursorR == 3)
             {
+               if (firstrow < PAGE_0_MAX - 4)
+          {
               firstrow++;
               update = true;
+          }
             }
             else
             {
               CursorR++;
               update = true;
             }
-          }
+         
           ClearKey();
         }
         if (KeyR)
@@ -538,36 +541,38 @@ void loop() {
       {
         if (KeyU)
         {
-          if (firstrow > 0)
+          if (CursorR == 0)
           {
-            if (CursorR == 0)
+            if (firstrow > 0)
             {
               firstrow--;
               update = true;
             }
-            else
-            {
-              CursorR--;
-              update = true;
-            }
           }
+          else
+          {
+            CursorR--;
+            update = true;
+          }
+
           ClearKey();
         }
         if (KeyD)
         {
-          if (firstrow != filemax - 3)
-          {
+         
             if (CursorR == 3)
             {
+              if (firstrow < filemax - 4)
+          {
               firstrow++;
               update = true;
+          }
             }
             else
             {
               CursorR++;
               update = true;
             }
-          }
           ClearKey();
         }
         if (KeyR)
@@ -621,36 +626,38 @@ void loop() {
       {
         if (KeyU)
         {
-          if (firstrow > 0)
-          {
+          
             if (CursorR == 0)
             {
+              if (firstrow > 0)
+          {
               firstrow--;
               update = true;
+          }
             }
             else
             {
               CursorR--;
               update = true;
             }
-          }
           ClearKey();
         }
         if (KeyD)
         {
-          if (firstrow != PAGE_0_MAX - 3)
-          {
+          
             if (CursorR == 3)
             {
+              if (firstrow < PAGE_0_MAX - 4)
+          {
               firstrow++;
               update = true;
+          }
             }
             else
             {
               CursorR++;
               update = true;
             }
-          }
           ClearKey();
         }
         if (KeyR)
@@ -1008,36 +1015,40 @@ void loop() {
       {
         if (KeyU)
         {
-          if (firstrow > 0)
-          {
+          
             if (CursorR == 0)
             {
+              if (firstrow > 0)
+          {
               firstrow--;
               update = true;
+          }
             }
             else
             {
               CursorR--;
               update = true;
             }
-          }
+          
           ClearKey();
         }
         if (KeyD)
         {
-          if (firstrow != PAGE_0_MAX - 3)
-          {
+          
             if (CursorR == 3)
             {
+              if (firstrow <filemax - 4)
+          {
               firstrow++;
               update = true;
+          }
             }
             else
             {
               CursorR++;
               update = true;
             }
-          }
+   
           ClearKey();
         }
         if (KeyR)
@@ -1558,6 +1569,11 @@ void LCDUpdate()
 {
   if (update)
   {
+    SerialUSB.println();
+    SerialUSB.println(firstrow);
+    SerialUSB.println(CursorR);
+    SerialUSB.println(filemax);
+    SerialUSB.println();
     analogWrite(LCD_LED_PIN, brightness);
     LCD.clear();
     switch (page) {
@@ -1569,45 +1585,52 @@ void LCDUpdate()
           for (n = firstrow; n < firstrow + 4; n++)
           {
             LCD.setCursor(n - firstrow, 1);
-            LCD.print(menu0[n - firstrow]);
-            if(n==(CursorR+firstrow))
-            SerialUSB.print(">");
-            SerialUSB.println(menu0[n - firstrow]);
+            if (n == (CursorR + firstrow))
+              SerialUSB.print(">");
+            SerialUSB.println(menu0[n]);
           }
         }
         break;
       case 1:
         {
-          ListSD();
+          filemax=ListSD();
           refresh = -1;
           LCD.setCursor(0, CursorR);
           LCD.write(1);
           for (n = firstrow; n < firstrow + 4; n++)
           {
             LCD.setCursor(n - firstrow, 1);
-            LCD.print(list[n - firstrow]);
-            if(n==(CursorR+firstrow))
-            SerialUSB.print(">");
-            SerialUSB.println(list[n - firstrow]);
+            LCD.print(list[n]);
+            if (n == (CursorR + firstrow))
+              SerialUSB.print(">");
+            SerialUSB.println(list[n]);
           }
         }
         break;
 
       case 2:
         {
+          
           refresh = -1;
           LCD.setCursor(0, CursorR);
           LCD.write(1);
           for (n = firstrow; n < firstrow + 4; n++)
           {
             LCD.setCursor(n - firstrow, 1);
-            LCD.print(menu1[n - firstrow]);
-            if(n==(CursorR+firstrow))
-            SerialUSB.print(">");
-            SerialUSB.println(menu1[n - firstrow]);
+            LCD.print(menu1[n]);
+            if (n == (CursorR + firstrow))
+              SerialUSB.print(">");
+            SerialUSB.println(menu1[n]);
           }
         }
         break;
+      case 3:
+      {
+        refresh=-1;
+        
+        
+      }
+      break;
 
       case 4:
         {
@@ -1715,13 +1738,17 @@ void LCDUpdate()
 
       case 20://Resume Print select file
         {
+          filemax=ListSD();
           refresh = -1;
           LCD.setCursor(0, CursorR);
           LCD.write(1);
           for (n = firstrow; n < firstrow + 4; n++)
           {
             LCD.setCursor(n - firstrow, 1);
-            LCD.print(list[n - firstrow]);
+            LCD.print(list[n]);
+            if (n == (CursorR + firstrow))
+              SerialUSB.print(">");
+            SerialUSB.println(list[n - firstrow]);
           }
         }
         break;
@@ -3220,7 +3247,7 @@ boolean TestKey(int KeyPin)
   long dc = 0;
   for (int dcc = 0; dcc < 10000; dcc++)
   {
-    dc=0;
+    dc = 0;
     while (dc < 2000000)
       dc++;
     if (digitalRead(KeyPin) == 1)
@@ -3299,29 +3326,52 @@ void KeyEMPressed()
   if (TestKey(KeyEM_PIN))
   {
     SerialUSB.println("KeyEM");
-    bed_pwr = 0;
-    refresh = -1;
-    digitalWrite(BED_PIN, LOW);
-    extruder_pwr = 0;
-    digitalWrite(EXTRUDER_PIN, LOW);
-    fan_speed = 0;
-    digitalWrite(FAN_PIN, LOW);
     buffer_switch = 0;
+          print_switch = 0;
+          buffer_switch = 0;
+          command_switch = 0;
+          yield();
+          dataFile.close();
+          long stopposition = membuffer[buffernum][printi].start;
+          long stopline = bufferstartposition[buffernum] + printi;
+          SerialUSB.print("Printing process is interrupted at ");
+          SerialUSB.print(stopposition);
+          SerialUSB.print("(Instruction No. ");
+          SerialUSB.print(stopline);
+          SerialUSB.print(") of the file '");
+          for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
+          {
+            SerialUSB.print(filename[n]);
+          }
+          SerialUSB.println("'");
 
-    long stopposition = membuffer[buffernum][printi].start;
-    long stopline = bufferstartposition[buffernum] + printi;
-    SerialUSB.print("Printing process is interrupted at ");
-    SerialUSB.print(stopposition);
-    SerialUSB.print("(Instruction No. ");
-    SerialUSB.print(stopline);
-    SerialUSB.print(") of the file '");
-    for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
-    {
-      SerialUSB.print(filename[n]);
-    }
-    page = 10;
-    refresh = -1;
-    update = true;
+          SerialUSB.print("Resume Argument: ");
+          SerialUSB.print("'X");
+          SerialUSB.print(current.x);
+          SerialUSB.print(" Y");
+          SerialUSB.print(current.y);
+          SerialUSB.print(" Z");
+          SerialUSB.print(current.z);
+          SerialUSB.print(" E");
+          SerialUSB.print(current.e);
+          SerialUSB.print(" F");
+          SerialUSB.print(feedrate);
+          SerialUSB.print(" B");
+          SerialUSB.print(bed_temp);
+          SerialUSB.print(" H");
+          SerialUSB.print(extruder_temp);
+          SerialUSB.print(" C");
+          SerialUSB.print(fan_speed);
+          SerialUSB.println("'");
+          bed_pwr = 0;
+          digitalWrite(BED_PIN, LOW);
+          extruder_pwr = 0;
+          digitalWrite(EXTRUDER_PIN, LOW);
+          fan_speed = 0;
+          digitalWrite(FAN_PIN, LOW);
+          page = 10;
+          update = true;
+          refresh = -1;
   }
 }
 
