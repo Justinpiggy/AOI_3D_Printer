@@ -21,7 +21,7 @@
 #define Z_STEPS_PER_MM   200
 
 #define E_STEPS_PER_INCH 19050
-#define E_STEPS_PER_MM   750
+#define E_STEPS_PER_MM   200
 
 #define MAX_FEEDRATE 2400
 
@@ -70,13 +70,13 @@
 #define LCD_D6 45
 #define LCD_D7 44
 
-#define KeyU_PIN A0
-#define KeyD_PIN A1
-#define KeyR_PIN A2
-#define KeyL_PIN A3
-#define KeyOK_PIN A4
-#define KeyB_PIN A5
-#define KeyEM_PIN A6
+#define KeyU_PIN A4
+#define KeyD_PIN A2
+#define KeyR_PIN A6
+#define KeyL_PIN A1
+#define KeyOK_PIN A3
+#define KeyB_PIN A0
+#define KeyEM_PIN A5
 
 struct LongPt {
   long x;
@@ -124,6 +124,7 @@ void StopSteppers();
 void CalDelta();
 void SETtarget(double x, double y, double z, double e);
 void SETposition(double x, double y, double z, double e);
+boolean TestKey(int KeyPin);
 
 FloatPt current;
 FloatPt target;
@@ -297,20 +298,21 @@ boolean KeyU, KeyD, KeyR, KeyL, KeyOK, KeyB;
 //Menu content
 char menu0[PAGE_0_MAX][20] = {"Print", "Resume Printing", "SD Info", "SD Refresh", "About"};
 char menu1[PAGE_1_MAX][20] = {"Select File", "Set File Offset", "Set X-axis", "Set Y-axis", "Set Z-axis", "Set E-pos", "Set Bed Temp", "Set Extruder Temp", "Set Fan Speed"};
-//Device instance
-MAX6675 get_extruder_temp(CS_E_PIN, SO_PIN, SCK_PIN, 1);
-MAX6675 get_bed_temp(CS_B_PIN, SO_PIN, SCK_PIN, 1);
-LiquidCrystal LCD(LCD_RS, LCD_EN, LCD_D0, LCD_D1, LCD_D2, LCD_D3, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
-PID bed_ctrl(&bed_input, &bed_output, &bed_set, bed_consKp, bed_consKi, bed_consKd, DIRECT);
-PID extruder_ctrl(&extruder_input, &extruder_output, &extruder_set, extruder_consKp, extruder_consKi, extruder_consKd, DIRECT);
 //Heating bed PID settings
 double bed_input, bed_output, bed_set;
 double bed_aggKp = 4, bed_aggKi = 0.2, bed_aggKd = 1.0;
 double bed_consKp = 1, bed_consKi = 0.05, bed_consKd = 0.25;
 //Extruder PID settings
 double extruder_input, extruder_output, extruder_set;
-double extruder_aggKp = 4, extruder_aggKi = 0.2, extruder_aggKd = 1.0;
-double extruder_consKp = 1, extruder_consKi = 0.05, extruder_consKd = 0.25;
+double extruder_aggKp = 50, extruder_aggKi = 0.2, extruder_aggKd = 1.0;
+double extruder_consKp = 15, extruder_consKi = 10, extruder_consKd = 0.2;
+//Device instance
+MAX6675 get_extruder_temp(CS_E_PIN, SO_PIN, SCK_PIN, 1);
+MAX6675 get_bed_temp(CS_B_PIN, SO_PIN, SCK_PIN, 1);
+LiquidCrystal LCD(LCD_RS, LCD_EN, LCD_D0, LCD_D1, LCD_D2, LCD_D3, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+PID bed_ctrl(&bed_input, &bed_output, &bed_set, bed_consKp, bed_consKi, bed_consKd, DIRECT);
+PID extruder_ctrl(&extruder_input, &extruder_output, &extruder_set, extruder_consKp, extruder_consKi, extruder_consKd, DIRECT);
+
 
 //setup
 void setup() {
@@ -350,6 +352,9 @@ void setup() {
   pinMode(FAN_PIN, OUTPUT);
   pinMode(BED_PIN, OUTPUT);
   pinMode(EXTRUDER_PIN, OUTPUT);
+  digitalWrite(FAN_PIN, LOW);
+  digitalWrite(BED_PIN, LOW);
+  digitalWrite(EXTRUDER_PIN, LOW);
   //Initialize PID arguments for heating bed
   bed_set = 100;
   bed_ctrl.SetOutputLimits(0, 255);
@@ -419,7 +424,7 @@ void setup() {
   attachInterrupt(KeyOK_PIN, KeyOKPressed, FALLING);
   attachInterrupt(KeyB_PIN, KeyBPressed, FALLING);
   attachInterrupt(KeyEM_PIN, KeyEMPressed, FALLING);
-  
+
   TestXMAXPos = true;
   TestYMAXPos = true;
   TestZMAXPos = true;
@@ -590,13 +595,14 @@ void loop() {
           CursorR = 0;
           ClearKey();
           SerialUSB.print("Printing File: ");
-          for (n = 0; list[select][n] != '\0'; n++)
+          for (n = 0; (list[select][n] != '\0') && (list[select][n] != '\n'); n++)
           {
             filename[n] = list[select][n];
             SerialUSB.print(filename[n]);
           }
           filename[n] = '\0';
           SerialUSB.println();
+          SerialUSB.print("Start");
           buffer_switch = 1;
           update = true;
         }
@@ -832,7 +838,6 @@ void loop() {
         }
         if (KeyL)
         {
-          KeyEMPressed();
           ClearKey();
         }
         if (KeyOK)
@@ -843,7 +848,6 @@ void loop() {
         }
         if (KeyB)
         {
-          KeyEMPressed();
           ClearKey();
         }
       }
@@ -1566,11 +1570,15 @@ void LCDUpdate()
           {
             LCD.setCursor(n - firstrow, 1);
             LCD.print(menu0[n - firstrow]);
+            if(n==(CursorR+firstrow))
+            SerialUSB.print(">");
+            SerialUSB.println(menu0[n - firstrow]);
           }
         }
         break;
       case 1:
         {
+          ListSD();
           refresh = -1;
           LCD.setCursor(0, CursorR);
           LCD.write(1);
@@ -1578,6 +1586,9 @@ void LCDUpdate()
           {
             LCD.setCursor(n - firstrow, 1);
             LCD.print(list[n - firstrow]);
+            if(n==(CursorR+firstrow))
+            SerialUSB.print(">");
+            SerialUSB.println(list[n - firstrow]);
           }
         }
         break;
@@ -1591,6 +1602,9 @@ void LCDUpdate()
           {
             LCD.setCursor(n - firstrow, 1);
             LCD.print(menu1[n - firstrow]);
+            if(n==(CursorR+firstrow))
+            SerialUSB.print(">");
+            SerialUSB.println(menu1[n - firstrow]);
           }
         }
         break;
@@ -2282,10 +2296,10 @@ void TempControl()
   delay(500);
   digitalWrite(13, LOW);
   delay(500);
+  bed_input = (double) get_bed_temp.read_temp();
   if (bed_pwr == 1)
   {
     bed_set = bed_temp;
-    bed_input = (double) get_bed_temp.read_temp();
     double delta_temp = abs(bed_input - bed_set);
     if (delta_temp < 10)
     {
@@ -2298,11 +2312,10 @@ void TempControl()
     bed_ctrl.Compute();
     analogWrite(BED_PIN, bed_output);
   }
-
+  extruder_input = (double) get_extruder_temp.read_temp();
   if (extruder_pwr == 1)
   {
     extruder_set = extruder_temp;
-    extruder_input = (double) get_extruder_temp.read_temp();
     double delta_temp = abs(extruder_input - extruder_set);
     if (delta_temp < 10)
     {
@@ -3202,63 +3215,114 @@ void StartZMIN()
   }
 }
 
-
+boolean TestKey(int KeyPin)
+{
+  long dc = 0;
+  for (int dcc = 0; dcc < 10000; dcc++)
+  {
+    dc=0;
+    while (dc < 2000000)
+      dc++;
+    if (digitalRead(KeyPin) == 1)
+    {
+      return false;
+    }
+  }
+  return true;
+}
 
 void KeyUPressed()
 {
-  KeyU = true;
+  if (TestKey(KeyU_PIN))
+  {
+    SerialUSB.println("KeyU");
+    KeyU = true;
+  }
 }
 
 void KeyDPressed()
 {
-  KeyD = true;
+  if (TestKey(KeyD_PIN))
+  {
+    SerialUSB.println("KeyD");
+    KeyD = true;
+  }
 }
 
 void KeyRPressed()
 {
-  KeyR = true;
+  long dc = 0;
+  while (dc < 20000000)
+    dc++;
+  if (digitalRead(KeyR_PIN) == 0)
+  {
+    dc = 0;
+    while (dc < 20000000)
+      dc++;
+    if (digitalRead(KeyR_PIN) == 0)
+    {
+      SerialUSB.println("KeyR");
+      KeyR = true;
+    }
+  }
 }
 
 void KeyLPressed()
 {
-  KeyL = true;
+  if (TestKey(KeyL_PIN))
+  {
+    SerialUSB.println("KeyL");
+    KeyL = true;
+  }
 }
 
 void KeyOKPressed()
 {
-  KeyOK = true;
+  if (TestKey(KeyOK_PIN))
+  {
+    SerialUSB.println("KeyOK");
+    KeyOK = true;
+  }
 }
 
 void KeyBPressed()
 {
-  KeyB = true;
+  if (TestKey(KeyB_PIN))
+  {
+    SerialUSB.println("KeyB");
+    KeyB = true;
+  }
 }
 
 void KeyEMPressed()
 {
-  bed_pwr = 0;
-  refresh = -1;
-  digitalWrite(BED_PIN, LOW);
-  extruder_pwr = 0;
-  digitalWrite(EXTRUDER_PIN, LOW);
-  fan_speed = 0;
-  digitalWrite(FAN_PIN, LOW);
-  buffer_switch = 0;
-
-  long stopposition = membuffer[buffernum][printi].start;
-  long stopline = bufferstartposition[buffernum] + printi;
-  SerialUSB.print("Printing process is interrupted at ");
-  SerialUSB.print(stopposition);
-  SerialUSB.print("(Instruction No. ");
-  SerialUSB.print(stopline);
-  SerialUSB.print(") of the file '");
-  for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
+  if (TestKey(KeyEM_PIN))
   {
-    SerialUSB.print(filename[n]);
+    SerialUSB.println("KeyEM");
+    bed_pwr = 0;
+    refresh = -1;
+    digitalWrite(BED_PIN, LOW);
+    extruder_pwr = 0;
+    digitalWrite(EXTRUDER_PIN, LOW);
+    fan_speed = 0;
+    digitalWrite(FAN_PIN, LOW);
+    buffer_switch = 0;
+
+    long stopposition = membuffer[buffernum][printi].start;
+    long stopline = bufferstartposition[buffernum] + printi;
+    SerialUSB.print("Printing process is interrupted at ");
+    SerialUSB.print(stopposition);
+    SerialUSB.print("(Instruction No. ");
+    SerialUSB.print(stopline);
+    SerialUSB.print(") of the file '");
+    for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
+    {
+      SerialUSB.print(filename[n]);
+    }
+    page = 10;
+    refresh = -1;
+    update = true;
   }
-  page = 10;
-  refresh = -1;
-  update = true;
 }
 
 
