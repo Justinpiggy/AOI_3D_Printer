@@ -9,7 +9,7 @@
 #define PAGE_0_MAX 5
 #define PAGE_1_MAX 9
 #define LCD_INTERVAL 500
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 10
 
 #define X_STEPS_PER_INCH 5080
 #define X_STEPS_PER_MM   200
@@ -2372,7 +2372,7 @@ void TempControl()
 
 void Print()
 {
-  if ((print_switch == 1) && (!decoding))
+  if (print_switch == 1)
   {
     SerialUSB.println("Printing start");
     for (printi = 0; (printi < bufferlength[buffernum]) && (print_switch == 1); printi++)
@@ -2478,6 +2478,7 @@ void SDtoMEM()
           fileposition++;
           ch = dataFile.read();
           SerialUSB.print(ch);
+          SerialUSB.print(j);
         }
         membuffer[1 - buffernum][bufferposition].st[j]=0;
         valid = j;
@@ -2487,6 +2488,7 @@ void SDtoMEM()
             ch = dataFile.read();
             fileposition++;
             j++;
+            
           }
         membuffer[1 - buffernum][bufferposition].leng = valid + 1;
         SerialUSB.println(membuffer[1 - buffernum][bufferposition].leng );
@@ -2508,6 +2510,7 @@ void SDtoMEM()
         bufferstartposition[1 - buffernum] = bufferstartposition[buffernum] + BUFFER_SIZE;
         while ((buffer_switch == 1) && (dataFile.available() > 0)  && (bufferposition < BUFFER_SIZE) && (fileposition < (filesize)))
         {
+          SerialUSB.println("Newline");
           j = 0;
           valid = 0;
           while ((buffer_switch == 1) && (dataFile.available() > 0) && (ch != '\n') && (ch != ';') && (fileposition < (filesize)) && (j < 180))
@@ -2517,6 +2520,7 @@ void SDtoMEM()
             fileposition++;
             ch = dataFile.read();
             SerialUSB.print(ch);
+            SerialUSB.print(j);
           }
           membuffer[1 - buffernum][bufferposition].st[j]=0;
           valid = j;
@@ -3057,7 +3061,7 @@ void Decode(char instruction[], int length)
           extruder_temp = FindData('S', instruction, length);
           SerialUSB.println(extruder_temp);
           extruder_pwr = 1;
-          while (!extruder_ok)
+          while ((!extruder_ok)&&(print_switch==1))
           {
             yield();
           }
@@ -3355,6 +3359,9 @@ void Initialize()
    printi=0;
           bufferstartposition[0] = 0;
           bufferstartposition[1] = 0;
+          bufferlength[0]=0;
+  bufferlength[1]=0;
+  printi=0;
           for (n = 0; n < BUFFER_SIZE; n++)
   {
     membuffer[0][n].start=0;
@@ -3362,22 +3369,26 @@ void Initialize()
     membuffer[1][n].start=0;
     membuffer[1][n].st[0]=0;
   }
-  bufferlength[0]=0;
-  bufferlength[1]=0;
+  decoding=false;
+  extruder_ok=false;
   fileposition=0;
+  extruder_temp=0;
+  bed_temp=0;
+  fan_speed=0;
+  
 }
 void EM()
 {
-  buffer_switch = 0;
+  
+          
+          long stopposition = membuffer[buffernum][printi].start;
+          long stopline = bufferstartposition[buffernum] + printi;
+        buffer_switch = 0;
           print_switch = 0;
           buffer_switch = 0;
           command_switch = 0;
 
           dataFile.close();
-          
-          long stopposition = membuffer[buffernum][printi].start;
-          long stopline = bufferstartposition[buffernum] + printi;
-         Initialize();
           SerialUSB.print("Printing process is interrupted at ");
           SerialUSB.print(stopposition);
           SerialUSB.print("(Instruction No. ");
@@ -3413,6 +3424,7 @@ void EM()
           digitalWrite(EXTRUDER_PIN, LOW);
           fan_speed = 0;
           digitalWrite(FAN_PIN, LOW);
+           Initialize();
           page = 10;
           update = true;
           refresh = -1;
