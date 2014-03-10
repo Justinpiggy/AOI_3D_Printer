@@ -126,6 +126,7 @@ void SETtarget(double x, double y, double z, double e);
 void SETposition(double x, double y, double z, double e);
 boolean TestKey(int KeyPin);
 void EM();
+void Initialize();
 
 FloatPt current;
 FloatPt target;
@@ -1692,7 +1693,7 @@ void LCDUpdate()
 
       case 9://Sensor Value
         {
-          refresh = 9;
+          //refresh = 9;
           LCD.setCursor(0, 0);
           char stemp[20];
           sprintf(stemp, "Ext % 3.0lf C -> % 3.0lf C", extruder_input, extruder_temp);
@@ -2049,8 +2050,8 @@ void LCDTimer() {
     long LCDs = millis();
     while (millis() - LCDs < 500)
     {
+      yield();
     }
-    yield();
   }
   yield();
 }
@@ -2378,8 +2379,6 @@ void Print()
     {
       //SerialUSB.println(printi);
       Decode(membuffer[buffernum][printi].st, membuffer[buffernum][printi].leng);
-      if (decoding)
-        yield();
       if (print_switch == 0)
         break;
     }
@@ -2455,6 +2454,7 @@ void SDtoMEM()
     if (dataFile)
     {
       dataFile.seek(fileposition);
+      SerialUSB.println("Buffering Data");
       buffernum = 1;
       char ch;
       filesize = dataFile.size();
@@ -3349,16 +3349,35 @@ void KeyEMPressed()
   }
 }
 
+
+void Initialize()
+{
+   printi=0;
+          bufferstartposition[0] = 0;
+          bufferstartposition[1] = 0;
+          for (n = 0; n < BUFFER_SIZE; n++)
+  {
+    membuffer[0][n].start=0;
+    membuffer[0][n].st[0]=0;
+    membuffer[1][n].start=0;
+    membuffer[1][n].st[0]=0;
+  }
+  bufferlength[0]=0;
+  bufferlength[1]=0;
+  fileposition=0;
+}
 void EM()
 {
   buffer_switch = 0;
           print_switch = 0;
           buffer_switch = 0;
           command_switch = 0;
-          yield();
+
           dataFile.close();
+          
           long stopposition = membuffer[buffernum][printi].start;
           long stopline = bufferstartposition[buffernum] + printi;
+         Initialize();
           SerialUSB.print("Printing process is interrupted at ");
           SerialUSB.print(stopposition);
           SerialUSB.print("(Instruction No. ");
@@ -3395,9 +3414,6 @@ void EM()
           fan_speed = 0;
           digitalWrite(FAN_PIN, LOW);
           page = 10;
-          firstrow=0;
-          CursorR=0;
-          fileposition=0;
           update = true;
           refresh = -1;
           ClearKey();
