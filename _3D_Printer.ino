@@ -312,7 +312,7 @@ double extruder_consKp = 15, extruder_consKi = 10, extruder_consKd = 0.2;
 //Device instance
 MAX6675 get_extruder_temp(CS_E_PIN, SO_PIN, SCK_PIN, 1);
 MAX6675 get_bed_temp(CS_B_PIN, SO_PIN, SCK_PIN, 1);
-LiquidCrystal LCD(LCD_RS, LCD_EN, LCD_D0, LCD_D1, LCD_D2, LCD_D3, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+LiquidCrystal LCD(LCD_RS, LCD_EN, /*LCD_D0, LCD_D1, LCD_D2, LCD_D3,*/ LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 PID bed_ctrl(&bed_input, &bed_output, &bed_set, bed_consKp, bed_consKi, bed_consKd, DIRECT);
 PID extruder_ctrl(&extruder_input, &extruder_output, &extruder_set, extruder_consKp, extruder_consKi, extruder_consKd, DIRECT);
 
@@ -2483,7 +2483,6 @@ void SDtoMEM()
           fileposition++;
           ch = dataFile.read();
           SerialUSB.print(ch);
-          SerialUSB.print(j);
         }
         membuffer[1 - buffernum][bufferposition].st[j]=0;
         valid = j;
@@ -2496,9 +2495,9 @@ void SDtoMEM()
             
           }
         membuffer[1 - buffernum][bufferposition].leng = valid + 1;
-        SerialUSB.println(membuffer[1 - buffernum][bufferposition].leng );
+        //SerialUSB.println(membuffer[1 - buffernum][bufferposition].leng );
         membuffer[1 - buffernum][bufferposition].start = fileposition - j - 1;
-        SerialUSB.println(membuffer[1 - buffernum][bufferposition].start);
+        //SerialUSB.println(membuffer[1 - buffernum][bufferposition].start);
         bufferposition++;
         if ((fileposition < (filesize)))
           ch = dataFile.read();
@@ -2515,7 +2514,6 @@ void SDtoMEM()
         bufferstartposition[1 - buffernum] = bufferstartposition[buffernum] + BUFFER_SIZE;
         while ((buffer_switch == 1) && (dataFile.available() > 0)  && (bufferposition < BUFFER_SIZE) && (fileposition < (filesize)))
         {
-          SerialUSB.println("Newline");
           j = 0;
           valid = 0;
           while ((buffer_switch == 1) && (dataFile.available() > 0) && (ch != '\n') && (ch != ';') && (fileposition < (filesize)) && (j < 180))
@@ -2525,7 +2523,6 @@ void SDtoMEM()
             fileposition++;
             ch = dataFile.read();
             SerialUSB.print(ch);
-            SerialUSB.print(j);
           }
           membuffer[1 - buffernum][bufferposition].st[j]=0;
           valid = j;
@@ -2537,9 +2534,9 @@ void SDtoMEM()
               j++;
             }
           membuffer[1 - buffernum][bufferposition].leng = valid + 1;
-          SerialUSB.println(membuffer[1 - buffernum][bufferposition].leng);
+          //SerialUSB.println(membuffer[1 - buffernum][bufferposition].leng);
           membuffer[1 - buffernum][bufferposition].start = fileposition - j - 1;
-          SerialUSB.println(membuffer[1 - buffernum][bufferposition].start);
+          //SerialUSB.println(membuffer[1 - buffernum][bufferposition].start);
           bufferposition++;
           ch = dataFile.read();
           SerialUSB.print(ch);
@@ -2556,7 +2553,12 @@ void SDtoMEM()
       }
       dataFile.close();
       SerialUSB.print("All Buffered");
-      timer=micros()-timer;
+      while ((print_switch == 1) && (buffer_switch == 1))
+        {
+          yield();
+        }
+        Initialize();
+      timer=millis()-timer;
       SerialUSB.print("Time use:");
       SerialUSB.println(timer);
       page = 11;
@@ -3445,7 +3447,7 @@ void EM()
 
 void Move(long micro_delay)
 {
-  long delaytime = micro_delay + 100;
+  long delaytime = micro_delay + 200;
   digitalWrite(X_ENABLE_PIN, LOW);
   digitalWrite(Y_ENABLE_PIN, LOW);
   digitalWrite(Z_ENABLE_PIN, LOW);
@@ -3467,7 +3469,7 @@ void Move(long micro_delay)
   TestE = true;
   unsigned int movecmd = 0;
   long time = micros();
-  long delay_counter = 1;
+  long delay_counter = 2;
   long steps_sum;
   steps_sum = -((long)current_steps.x - (long)target_steps.x) * (x_direction ? 1 : -1);
   steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
@@ -3480,11 +3482,11 @@ void Move(long micro_delay)
     steps_sum = -((long)current_steps.x - (long)target_steps.x) * (x_direction ? 1 : -1);
     steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
     steps_sum += -((long)current_steps.z - (long)target_steps.z) * (z_direction ? 1 : -1);
-    if (steps_sum > (all_steps - 100))
+    if (steps_sum > (all_steps - 90))
     {
       delaytime -= delay_counter;
     }
-    if (steps_sum < 100)
+    if (steps_sum < 80)
     {
       delaytime += delay_counter;
     }
