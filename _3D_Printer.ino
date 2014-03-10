@@ -9,7 +9,7 @@
 #define PAGE_0_MAX 5
 #define PAGE_1_MAX 9
 #define LCD_INTERVAL 500
-#define BUFFER_SIZE 10
+#define BUFFER_SIZE 100
 
 #define X_STEPS_PER_INCH 5080
 #define X_STEPS_PER_MM   200
@@ -224,6 +224,7 @@ uint8_t Black[6][8] = {{
     B11111,
   }
 };
+long timer;
 //Stepper direction
 boolean x_direction = 1;
 boolean y_direction = 1;
@@ -2441,6 +2442,7 @@ void SerialUSBReport()
     SerialUSB.print(bed_temp);
     SerialUSB.print(" C | Fan Speed= ");
     SerialUSB.println(fan_speed);
+    SerialUSB.println(timer);
     delay(report_delay * 1000);
   }
   yield();
@@ -2454,6 +2456,9 @@ void SDtoMEM()
     if (dataFile)
     {
       dataFile.seek(fileposition);
+      SerialUSB.print("Start Time:");
+      timer=millis();
+      SerialUSB.println(timer);
       SerialUSB.println("Buffering Data");
       buffernum = 1;
       char ch;
@@ -2551,6 +2556,9 @@ void SDtoMEM()
       }
       dataFile.close();
       SerialUSB.print("All Buffered");
+      timer=micros()-timer;
+      SerialUSB.print("Time use:");
+      SerialUSB.println(timer);
       page = 11;
       update = true;
 
@@ -3020,7 +3028,7 @@ void Decode(char instruction[], int length)
         break;
 
       case 104:
-        if (FindData('S', instruction, length) == 0)
+        if ((FindData('S', instruction, length) == 0)||(FindData('S', instruction, length) == 32767))
         {
           SerialUSB.println("Extruder heating OFF");
           digitalWrite(EXTRUDER_PIN, LOW);
@@ -3050,7 +3058,7 @@ void Decode(char instruction[], int length)
         break;
 
       case 109:
-        if (FindData('S', instruction, length) == 0)
+        if ((FindData('S', instruction, length) == 0)||(FindData('S', instruction, length) == 32767))
         {
           SerialUSB.println("Extruder heating OFF");
           digitalWrite(EXTRUDER_PIN, LOW);
@@ -3071,7 +3079,7 @@ void Decode(char instruction[], int length)
       case 140:
         if (FindCommand('S', instruction, length))
         {
-          if (FindData('S', instruction, length) == 0)
+          if ((FindData('S', instruction, length) == 0)||(FindData('S', instruction, length) == 32767))
           {
             SerialUSB.println("Bed heating OFF");
             digitalWrite(BED_PIN, LOW);
