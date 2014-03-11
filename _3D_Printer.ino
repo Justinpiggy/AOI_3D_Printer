@@ -1076,7 +1076,7 @@ void loop() {
         if (KeyOK)
         {
           int select = firstrow + CursorR;
-          page = 8;
+          page++;
           firstrow = 0;
           CursorR = 0;
           ClearKey();
@@ -1088,7 +1088,6 @@ void loop() {
           }
           filename[n] = '\0';
           SerialUSB.println();
-          page = 7;
           update = true;
 
         }
@@ -1134,6 +1133,9 @@ void loop() {
           {
             fileposition += P[n] * Dec[n];
           }
+          dataFile=SD.open(filename);
+          filesize=dataFile.size();
+          dataFile.close();
           if (fileposition <= filesize)
           {
             page++;
@@ -1537,12 +1539,23 @@ void loop() {
           }
           if (fan_speed <= 255)
           {
-
-
-            //RESUME PRINTING
-            page++;
-            for (n = 0; n < 9; n++)
+            int select = firstrow + CursorR;
+          page = 9;
+          firstrow = 0;
+          CursorR = 0;
+          ClearKey();
+          SerialUSB.print("Printing File: ");
+          for (n = 0; (filename[n] != '\0') && (filename[n] != '\n'); n++)
+          {
+            SerialUSB.print(filename[n]);
+          }
+          SerialUSB.println();
+          for (n = 0; n < 9; n++)
               P[n] = 0;
+          SerialUSB.print("Start");
+          buffer_switch = 1;
+            //RESUME PRINTING
+            
             update = true;
           }
           else
@@ -1580,6 +1593,7 @@ void LCDUpdate()
     SerialUSB.println(firstrow);
     SerialUSB.println(CursorR);
     SerialUSB.println(filemax);
+    SerialUSB.println(page);
     SerialUSB.println();
     analogWrite(LCD_LED_PIN, brightness);
     LCD.clear();
