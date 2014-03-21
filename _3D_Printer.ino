@@ -266,6 +266,7 @@ int bufferlength[2] = {0, 0};
 int bufferstartposition[2] = {0, 0};
 int buffernum = 0;
 int printi = 0;
+long stopposition, stopline;
 //Status register
 boolean decoding = false;
 boolean extruder_ok = false;
@@ -284,11 +285,12 @@ int CursorR = 0;
 boolean update = false;
 int refresh = -1;
 int brightness = 200;
+boolean EMS = false;
 //Keyboard status
 boolean KeyU, KeyD, KeyR, KeyL, KeyOK, KeyB;
 //Menu content
 char menu0[PAGE_0_MAX][20] = {"Print", "Resume Printing", "SD Info", "SD Refresh", "About"};
-char menu1[PAGE_1_MAX][20] = {"Select File", "Set File Offset", "Set X-axis", "Set Y-axis", "Set Z-axis", "Set E-pos","Set Feedrate", "Set Bed Temp", "Set Extruder Temp", "Set Fan Speed"};
+char menu1[PAGE_1_MAX][20] = {"Select File", "Set File Offset", "Set X-axis", "Set Y-axis", "Set Z-axis", "Set E-pos", "Set Feedrate", "Set Bed Temp", "Set Extruder Temp", "Set Fan Speed"};
 //Heating bed PID settings
 double bed_input, bed_output, bed_set;
 double bed_aggKp = 4, bed_aggKi = 0.2, bed_aggKd = 1.0;
@@ -331,10 +333,10 @@ void setup() {
   }
   //Initialize LCD
   LCD.begin(20, 4);
-  LCD.createChar(1, ArrowR);
-  LCD.createChar(2, ArrowU);
+  LCD.createChar(0, ArrowR);
+  LCD.createChar(1, ArrowU);
   for (n = 0; n < 5; n++)
-    LCD.createChar(n + 3, Black[n]);
+    LCD.createChar(n + 2, Black[n]);
   LCD.setCursor(0, 0);
   LCD.print("AOI 3D Printer");
   LCD.setCursor(0, 1);
@@ -455,8 +457,8 @@ void setup() {
   SerialUSB.print(report_delay);
   SerialUSB.println("s");
   SerialUSB.println("'$'--COMMAND\n'P'--START PRINTING\n'R'--RESUME\n'S'--STOP\n'F'--FILE\n'I'--REPORT INTERVAL\n'O'--FILE OFFSET\n'L'--LIST SD\n'W'--WRITE TO FILE\n");
-  update=true;
-  page=0;
+  update = true;
+  page = 0;
 }
 
 void loop() {
@@ -835,7 +837,7 @@ void loop() {
         if (KeyR)
         {
           page = 9;
-          refresh=9;
+          refresh = 9;
           update = true;
           ClearKey();
         }
@@ -846,7 +848,7 @@ void loop() {
         if (KeyOK)
         {
           page = 9;
-          refresh=9;
+          refresh = 9;
           update = true;
           ClearKey();
         }
@@ -1187,7 +1189,6 @@ void loop() {
             resume.x += P[n + 5] * Dec[n];
           }
           SerialUSB.println(resume.x);
-          current.x=resume.x;
           for (n = 0; n < 10; n++)
             P[n] = 0;
           page++;
@@ -1241,7 +1242,6 @@ void loop() {
           {
             resume.y += P[n + 5] * Dec[n];
           }
-          current.y=resume.y;
           for (n = 0; n < 10; n++)
             P[n] = 0;
           page++;
@@ -1293,7 +1293,6 @@ void loop() {
           {
             resume.z += P[n + 5] * Dec[n];
           }
-          current.z=resume.z;
           for (n = 0; n < 10; n++)
             P[n] = 0;
           page++;
@@ -1347,7 +1346,7 @@ void loop() {
           {
             resume.e += P[n + 5] * Dec[n];
           }
-          current.e=resume.e;
+          current.e = resume.e;
           for (n = 0; n < 10; n++)
             P[n] = 0;
           page++;
@@ -1555,6 +1554,12 @@ void loop() {
             CursorR = 0;
             ClearKey();
             SerialUSB.print("Printing File: ");
+            LCD.clear();
+            LCD.setCursor(0,0);
+            LCD.print("Preparing to Resume");
+            LCD.setCursor(0,1);
+            LCD.print("File: ");
+            LCD.print(filename);
             for (n = 0; (filename[n] != '\0') && (filename[n] != '\n'); n++)
             {
               SerialUSB.print(filename[n]);
@@ -1563,9 +1568,49 @@ void loop() {
             for (n = 0; n < 10; n++)
               P[n] = 0;
             SerialUSB.print("Start");
-            buffer_switch = 1;
-            //RESUME PRINTING
+            LCD.setCursor(0,3);
+            LCD.print("Calibrate Extruder");
+          command_switch = 1;
+          Decode("G0 X-100 Y-100 Z300", 18);
+          command_switch = 1;
+          Decode("G0 Z-100", 9);
+          SETtarget(0, 0, 0, 0);
+          SETposition(0, 0, 0, 0);
+          command_switch = 1;
+          Decode("G0 Z300", 18);
+            target.x = resume.x;
+            target.y = resume.y;
+            target.z = resume.z;
 
+            target.e = resume.e;
+            current.e = target.e;
+
+            feedrate = FindData('F', data, i - 1);
+            bed_temp = FindData('B', data, i - 1);
+            if (bed_temp == 0)
+              bed_pwr = 0;
+            else bed_pwr = 1;
+            if (extruder_temp == 0)
+              extruder_pwr = 0;
+            else {
+              extruder_pwr = 1;
+              SerialUSB.println("Preheating Extruder");
+              LCD.setCursor(0,3);
+            LCD.print("Preheating Extruder ");
+              while (!extruder_ok)
+              {
+                yield();
+              }
+            }
+            analogWrite(FAN_PIN, fan_speed);
+          CalDelta();
+          LCD.setCursor(0,3);
+            LCD.print("Extruder Approching");
+          Move(60000000 / x_unit / MAX_FEEDRATE);
+          buffer_switch=1;
+          
+       
+          
             update = true;
           }
           else
@@ -1613,11 +1658,11 @@ void LCDUpdate()
       case 0 :
         {
           refresh = -1;
-          LCD.setCursor(0,CursorR);
-          LCD.write(1);
+          LCD.setCursor(0, CursorR);
+          LCD.write(byte(0));
           for (n = firstrow; n < firstrow + 4; n++)
           {
-            LCD.setCursor(1,n - firstrow);
+            LCD.setCursor(1, n - firstrow);
             if (n == (CursorR + firstrow))
               SerialUSB.print(">");
             SerialUSB.println(menu0[n]);
@@ -1630,10 +1675,10 @@ void LCDUpdate()
 
           refresh = -1;
           LCD.setCursor(0, CursorR);
-          LCD.write(1);
+          LCD.write(byte(0));
           for (n = firstrow; n < firstrow + 4; n++)
           {
-            LCD.setCursor(1,n - firstrow);
+            LCD.setCursor(1, n - firstrow);
             if (n == (CursorR + firstrow))
               SerialUSB.print(">");
             SerialUSB.println(list[n]);
@@ -1647,10 +1692,10 @@ void LCDUpdate()
 
           refresh = -1;
           LCD.setCursor(0, CursorR);
-          LCD.write(1);
+          LCD.write(byte(0));
           for (n = firstrow; n < firstrow + 4; n++)
           {
-            LCD.setCursor(1,n - firstrow);
+            LCD.setCursor(1, n - firstrow);
             LCD.print(menu1[n]);
             if (n == (CursorR + firstrow))
               SerialUSB.print(">");
@@ -1661,8 +1706,54 @@ void LCDUpdate()
       case 3:
         {
           refresh = -1;
-
-
+          Sd2Card card;
+          SdVolume volume;
+          SdFile root;
+          if (card.init(SPI_HALF_SPEED, SD_CS_PIN))
+          {
+            LCD.setCursor(0, 0);
+            LCD.print("Card Type: ");
+            switch (card.type()) {
+              case SD_CARD_TYPE_SD1:
+                LCD.print("SD1");
+                break;
+              case SD_CARD_TYPE_SD2:
+                LCD.print("SD2");
+                break;
+              case SD_CARD_TYPE_SDHC:
+                LCD.print("SDHC");
+                break;
+              default:
+                Serial.print("Unknown");
+            }
+            if (volume.init(card))
+            {
+              LCD.setCursor(0, 1);
+              LCD.print("Format: FAT");
+              LCD.print(volume.fatType(), DEC);
+              LCD.setCursor(0, 2);
+              LCD.print("Size: ");
+              uint32_t volumesize;
+              volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
+              volumesize *= volume.clusterCount();       // we'll have a lot of clusters
+              volumesize /= 2048;
+              LCD.print(volumesize);
+              LCD.print(" MB");
+            }
+            else
+            {
+              LCD.setCursor(0, 1);
+              LCD.print("No valid volume");
+            }
+            SD.begin(SD_CS_PIN);
+          }
+          else
+          {
+            LCD.setCursor(0, 0);
+            LCD.print("SD card not found");
+          }
+          LCD.setCursor(0, 3);
+          LCD.print("Press LEFT key");
         }
         break;
 
@@ -1671,22 +1762,22 @@ void LCDUpdate()
           refresh = -1;
           LCD.setCursor(0, 0);
           LCD.print("Waiting for SD card");
-          if (!SD.begin(SD_CS_PIN)) {
+          Sd2Card card;
+          if (!card.init(SPI_HALF_SPEED, SD_CS_PIN)) {
             SerialUSB.println("SD card not found");
             LCD.setCursor(0, 1);
             LCD.print("SD card not found");
             IsSD = false;
           }
           else {
+            SD.begin(SD_CS_PIN);
             SerialUSB.println("SD card connected");
             LCD.setCursor(0, 1);
             LCD.print("SD card connected");
             IsSD = true;
           }
           LCD.setCursor(0, 3);
-          LCD.print("Press   button");
-          LCD.setCursor(6, 3);
-          LCD.write(2);
+          LCD.print("Press LEFT key");
         }
         break;
       case 5: //About Page
@@ -1742,9 +1833,12 @@ void LCDUpdate()
       case 10://Stop Page
         {
           refresh = -1;
+          yield();
           LCD.setCursor(0, 0);
-          long stopposition = bufferstartposition[buffernum] + printi;
-          long stopline = membuffer[buffernum][printi].start;
+          SerialUSB.println("Forced");
+          EMS = false;
+          //stopposition = bufferstartposition[buffernum] + printi;
+          //stopline = membuffer[buffernum][printi].start;
           LCD.print("Interrupted at ");
           LCD.setCursor(0, 1);
           LCD.print("Pos= ");
@@ -1753,7 +1847,7 @@ void LCDUpdate()
           LCD.print("Cmd No.= ");
           LCD.print(stopline);
           LCD.setCursor(0, 3);
-          LCD.print("Press any key to exit");
+          LCD.print("Press any key");
           SerialUSB.println("Stopped");
         }
         break;
@@ -1767,7 +1861,7 @@ void LCDUpdate()
           LCD.print("3D Printing Done!");
           LCD.setCursor(0, 2);
           LCD.setCursor(0, 3);
-          LCD.print("Press any key to exit");
+          LCD.print("Press any key");
         }
         break;
 
@@ -1776,10 +1870,10 @@ void LCDUpdate()
 
           refresh = -1;
           LCD.setCursor(0, CursorR);
-          LCD.write(1);
+          LCD.write(byte(0));
           for (n = firstrow; n < firstrow + 4; n++)
           {
-            LCD.setCursor(1,n - firstrow);
+            LCD.setCursor(1, n - firstrow);
             if (n == (CursorR + firstrow))
               SerialUSB.print(">");
             SerialUSB.println(list[n]);
@@ -1794,13 +1888,13 @@ void LCDUpdate()
           LCD.setCursor(0, 0);
           LCD.print("Set File Position");
           LCD.setCursor(5, 1);
-          long tmp=fileposition;
+          long tmp = fileposition;
           for (n = 0; n < 10; n++)
           {
             P[n] = tmp % 10;
             tmp /= 10;
           }
-          for (n = 0; n<10; n++)
+          for (n = 0; n < 10; n++)
           {
             LCD.print(P[9 - n]);
             SerialUSB.print(P[9 - n]);
@@ -1808,7 +1902,7 @@ void LCDUpdate()
           SerialUSB.println();
           LCD.setCursor(14, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
 
@@ -1818,7 +1912,7 @@ void LCDUpdate()
           LCD.setCursor(0, 0);
           LCD.print("Set X Position");
           LCD.setCursor(5, 1);
-          long ltemp = current.x*100000 ;
+          long ltemp = resume.x * 100000 ;
           SerialUSB.println(ltemp);
           for (n = 0; n < 10; n++)
           {
@@ -1836,7 +1930,7 @@ void LCDUpdate()
           }
           LCD.setCursor(15, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
 
@@ -1846,11 +1940,11 @@ void LCDUpdate()
           LCD.setCursor(0, 0);
           LCD.print("Set Y Position");
           LCD.setCursor(5, 1);
-          long ltemp = current.y * 100000;
+          long ltemp = resume.y * 100000;
           SerialUSB.println(ltemp);
           for (n = 0; n < 10; n++)
           {
-            P[n] = ltemp% 10;
+            P[n] = ltemp % 10;
             ltemp = ltemp / 10;
           }
           for (n = 0; n < 5; n++)
@@ -1864,7 +1958,7 @@ void LCDUpdate()
           }
           LCD.setCursor(15, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
 
@@ -1874,7 +1968,7 @@ void LCDUpdate()
           LCD.setCursor(0, 0);
           LCD.print("Set Z Position");
           LCD.setCursor(5, 1);
-          long ltemp = current.z * 100000;
+          long ltemp = resume.z * 100000;
           SerialUSB.println(ltemp);
           for (n = 0; n < 10; n++)
           {
@@ -1892,7 +1986,7 @@ void LCDUpdate()
           }
           LCD.setCursor(15, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
 
@@ -1902,7 +1996,7 @@ void LCDUpdate()
           LCD.setCursor(0, 0);
           LCD.print("Set E Position");
           LCD.setCursor(5, 1);
-          long ltemp = current.e * 100000;
+          long ltemp = resume.e * 100000;
           SerialUSB.println(ltemp);
           for (n = 0; n < 10; n++)
           {
@@ -1920,7 +2014,7 @@ void LCDUpdate()
           }
           LCD.setCursor(15, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
       case 26://Resume Print select F
@@ -1947,7 +2041,7 @@ void LCDUpdate()
           }
           LCD.setCursor(15, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
 
@@ -1961,7 +2055,7 @@ void LCDUpdate()
           SerialUSB.println(ltemp);
           for (n = 0; n < 10; n++)
           {
-            P[n] = ltemp %10;
+            P[n] = ltemp % 10;
             ltemp = ltemp / 10;
           }
           for (n = 0; n < 5; n++)
@@ -1975,7 +2069,7 @@ void LCDUpdate()
           }
           LCD.setCursor(15, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
 
@@ -2003,7 +2097,7 @@ void LCDUpdate()
           }
           LCD.setCursor(15, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
 
@@ -2013,21 +2107,21 @@ void LCDUpdate()
           LCD.setCursor(0, 0);
           LCD.print("Set Fan Speed");
           LCD.setCursor(5, 1);
-          long ltemp=fan_speed;
+          long ltemp = fan_speed;
           SerialUSB.println(ltemp);
           for (n = 0; n < 10; n++)
           {
-            P[n] = ltemp%10;
-            ltemp=ltemp/ 10;
+            P[n] = ltemp % 10;
+            ltemp = ltemp / 10;
           }
-          for (n = 0; n<10; n++)
+          for (n = 0; n < 10; n++)
           {
             LCD.print(P[9 - n]);
             SerialUSB.print(P[9 - n]);
           }
           LCD.setCursor(14, 2);
           digit = 0;
-          LCD.write(2);
+          LCD.write(1);
         }
         break;
 
@@ -2060,7 +2154,15 @@ void LCDTimer() {
           LCD.setCursor(1, 1);
           LCD.print(filename);
           long stopposition = bufferstartposition[buffernum] + printi;
-          double report = (double)(stopposition / filesize);
+          double report;
+          if (printi == BUFFER_SIZE - 1)
+          report = membuffer[1 - buffernum][printi].start;
+           else
+           report = membuffer[buffernum][printi].start;
+          report = membuffer[buffernum][printi].start;
+         report /= filesize;
+          SerialUSB.print(report*100);
+          SerialUSB.println("%");
           ShowProgress(0, 3, 15, report);
           LCD.setCursor(16, 3);
           LCD.print((int)(report * 100));
@@ -2312,15 +2414,15 @@ void SerialCLI() {
         break;
       case 'S' :
         {
-
+          stopposition = membuffer[buffernum][printi].start;
+          stopline = bufferstartposition[buffernum] + printi;
           buffer_switch = 0;
           print_switch = 0;
           buffer_switch = 0;
           command_switch = 0;
           yield();
           dataFile.close();
-          long stopposition = membuffer[buffernum][printi].start;
-          long stopline = bufferstartposition[buffernum] + printi;
+
           SerialUSB.print("Printing process is interrupted at ");
           SerialUSB.print(stopposition);
           SerialUSB.print("(Instruction No. ");
@@ -2606,9 +2708,12 @@ void SDtoMEM()
       timer = millis() - timer;
       SerialUSB.print("Time use:");
       SerialUSB.println(timer);
-      page = 11;
-      update = true;
-
+      if (!EMS)
+      {
+        SerialUSB.println("Finish work");
+        page = 11;
+        update = true;
+      }
     }
     else {
       SerialUSB.println("ERROR: Cannot open the file");
@@ -2637,9 +2742,9 @@ int Add(int d)
     {
       P[d] = 0;
       if (d < 5)
-      LCD.setCursor(15 - d, 1);
-    else
-      LCD.setCursor(14 - d, 1);
+        LCD.setCursor(15 - d, 1);
+      else
+        LCD.setCursor(14 - d, 1);
     }
     LCD.print(P[d]);
     return 1;
@@ -2671,7 +2776,7 @@ int MoveR(int d)
       LCD.setCursor(15 - d, 2);
     else
       LCD.setCursor(14 - d, 2);
-    LCD.write(2);
+    LCD.write(1);
   }
   else {
     if (d < 5)
@@ -2684,7 +2789,7 @@ int MoveR(int d)
       LCD.setCursor(15 - d, 2);
     else
       LCD.setCursor(14 - d, 2);
-    LCD.write(2);
+    LCD.write(1);
   }
   return d;
 }
@@ -2702,7 +2807,7 @@ int MoveL(int d)
       LCD.setCursor(15 - d, 2);
     else
       LCD.setCursor(14 - d, 2);
-    LCD.write(2);
+    LCD.write(1);
   }
   else {
     if (d < 5)
@@ -2715,7 +2820,7 @@ int MoveL(int d)
       LCD.setCursor(15 - d, 2);
     else
       LCD.setCursor(14 - d, 2);
-    LCD.write(2);
+    LCD.write(1);
   }
   return d;
 }
@@ -2759,14 +2864,14 @@ int LMoveR(int d)
     LCD.print(" ");
     d--;
     LCD.setCursor(14 - d, 2);
-    LCD.write(2);
+    LCD.write(1);
   }
   else {
     LCD.setCursor(14 - d, 2);
     LCD.print(" ");
     d = 9;
     LCD.setCursor(14 - d, 2);
-    LCD.write(2);
+    LCD.write(1);
   }
   return d;
 }
@@ -2778,14 +2883,14 @@ int LMoveL(int d)
     LCD.print(" ");
     d++;
     LCD.setCursor(14 - d, 2);
-    LCD.write(2);
+    LCD.write(1);
   }
   else {
     LCD.setCursor(14 - d, 2);
     LCD.print(" ");
     d = 0;
     LCD.setCursor(14 - d, 2);
-    LCD.write(2);
+    LCD.write(1);
   }
   return d;
 }
@@ -2795,15 +2900,16 @@ void ShowProgress(int x, int y, int barlen, double progress)
 {
   double progress_temp = progress * barlen;
   int block_counter = progress_temp;
-  progress_temp = (progress - (double)block_counter) * 5;
+  progress_temp = (progress_temp - (double)block_counter) * 5;
   int block_divider = progress_temp;
   LCD.setCursor(x, y);
   SerialUSB.println(block_counter);
   SerialUSB.println(block_divider);
   for (int progress_c = 0; progress_c < block_counter; progress_c++)
-    LCD.write(7);
-  if(block_divider!=0)
-    LCD.write(3 + block_divider);
+    LCD.write(6);
+  if (block_divider != 0)
+    LCD.write(1 + block_divider);
+   else LCD.print(" ");
 }
 
 int ListSD()
@@ -3361,19 +3467,10 @@ void KeyDPressed()
 
 void KeyRPressed()
 {
-  long dc = 0;
-  while (dc < 20000000)
-    dc++;
-  if (digitalRead(KeyR_PIN) == 0)
+  if (TestKey(KeyR_PIN))
   {
-    dc = 0;
-    while (dc < 20000000)
-      dc++;
-    if (digitalRead(KeyR_PIN) == 0)
-    {
-      SerialUSB.println("KeyR");
-      KeyR = true;
-    }
+    SerialUSB.println("KeyR");
+    KeyR = true;
   }
 }
 
@@ -3408,8 +3505,11 @@ void KeyEMPressed()
 {
   if (TestKey(KeyEM_PIN))
   {
-    SerialUSB.println("KeyEM");
-    EM();
+    if (TestKey(KeyEM_PIN))
+    {
+      SerialUSB.println("KeyEM");
+      EM();
+    }
   }
 }
 
@@ -3440,9 +3540,9 @@ void Initialize()
 void EM()
 {
 
-
-  long stopposition = membuffer[buffernum][printi].start;
-  long stopline = bufferstartposition[buffernum] + printi;
+  EMS = true;
+  stopposition = membuffer[buffernum][printi].start;
+  stopline = bufferstartposition[buffernum] + printi;
   buffer_switch = 0;
   print_switch = 0;
   buffer_switch = 0;
@@ -3486,9 +3586,11 @@ void EM()
   digitalWrite(FAN_PIN, LOW);
   Initialize();
   page = 10;
+  EMS = true;
   update = true;
   refresh = -1;
   ClearKey();
+  SerialUSB.println(EMS);
 }
 
 
