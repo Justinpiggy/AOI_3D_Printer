@@ -9,7 +9,7 @@
 #define PAGE_0_MAX 5
 #define PAGE_1_MAX 10
 #define LCD_INTERVAL 500
-#define BUFFER_SIZE 500
+#define BUFFER_SIZE 100
 
 #define X_STEPS_PER_INCH 5080
 #define X_STEPS_PER_MM   200
