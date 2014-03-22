@@ -9,7 +9,7 @@
 #define PAGE_0_MAX 5
 #define PAGE_1_MAX 10
 #define LCD_INTERVAL 500
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 10
 
 #define X_STEPS_PER_INCH 5080
 #define X_STEPS_PER_MM   200
@@ -47,15 +47,13 @@
 #define E_DIR_PIN 36
 #define E_ENABLE_PIN 37
 
-#define EXTRUDER_PIN 6
-#define BED_PIN 7
+#define EXTRUDER_PIN 5
+#define BED_PIN 6
 #define FAN_PIN 11
 #define SD_CS_PIN 8
 
-#define SCK_E_PIN 2
-#define SO_E_PIN 3
-#define SCK_B_PIN 4
-#define SO_B_PIN 5
+#define SCK_PIN 2
+#define SO_PIN 3
 #define CS_E_PIN 22
 #define CS_B_PIN 23
 
@@ -214,15 +212,6 @@ uint8_t Black[5][8] = {
     B11111,
   }
 };
-uint8_t bar[8]={
-    B00000,
-    B10000,
-    B01000,
-    B00100,
-    B00010,
-    B00001,
-    B00000,
-  };
 long timer;
 //Stepper direction
 boolean x_direction = 1;
@@ -297,7 +286,6 @@ boolean update = false;
 int refresh = -1;
 int brightness = 200;
 boolean EMS = false;
-byte pic=0;
 //Keyboard status
 boolean KeyU, KeyD, KeyR, KeyL, KeyOK, KeyB;
 //Menu content
@@ -312,8 +300,8 @@ double extruder_input, extruder_output, extruder_set;
 double extruder_aggKp = 50, extruder_aggKi = 0.2, extruder_aggKd = 1.0;
 double extruder_consKp = 15, extruder_consKi = 10, extruder_consKd = 0.2;
 //Device instance
-MAX6675 get_extruder_temp(CS_E_PIN, SO_E_PIN, SCK_E_PIN, 1);
-MAX6675 get_bed_temp(CS_B_PIN, SO_B_PIN, SCK_B_PIN, 1);
+MAX6675 get_extruder_temp(CS_E_PIN, SO_PIN, SCK_PIN, 1);
+MAX6675 get_bed_temp(CS_B_PIN, SO_PIN, SCK_PIN, 1);
 LiquidCrystal LCD(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 PID bed_ctrl(&bed_input, &bed_output, &bed_set, bed_consKp, bed_consKi, bed_consKd, DIRECT);
 PID extruder_ctrl(&extruder_input, &extruder_output, &extruder_set, extruder_consKp, extruder_consKi, extruder_consKd, DIRECT);
@@ -322,10 +310,10 @@ PID extruder_ctrl(&extruder_input, &extruder_output, &extruder_set, extruder_con
 //setup
 void setup() {
   SerialUSB.begin(115200);
-  while(!SerialUSB)
+  //Waiting for Arduino Due SerialUSB
+  while (!SerialUSB)
   {
   }
-  //Waiting for Arduino Due SerialUSB
   //Initialize filename
   for (n = 0; n < 100; n++)
   {
@@ -349,7 +337,6 @@ void setup() {
   LCD.createChar(1, ArrowU);
   for (n = 0; n < 5; n++)
     LCD.createChar(n + 2, Black[n]);
-    LCD.createChar(7, bar);
   LCD.setCursor(0, 0);
   LCD.print("AOI 3D Printer");
   LCD.setCursor(0, 1);
@@ -466,7 +453,6 @@ void setup() {
     LCD.print("SD card connected");
     IsSD = true;
   }
-  delay(1000);
   SerialUSB.print("SERIAL REPORT INTERVAL SET TO ");
   SerialUSB.print(report_delay);
   SerialUSB.println("s");
@@ -837,15 +823,15 @@ void loop() {
       {
         if (KeyU)
         {
-          if (brightness < 240)
-            brightness+=10;
+          if (brightness < 255)
+            brightness++;
           update = true;
           ClearKey();
         }
         if (KeyD)
         {
-          if (brightness > 10)
-            brightness-=10;
+          if (brightness > 0)
+            brightness--;
           update = true;
           ClearKey();
         }
@@ -878,15 +864,15 @@ void loop() {
       {
         if (KeyU)
         {
-          if (brightness < 240)
-            brightness+=10;
+          if (brightness < 255)
+            brightness++;
           update = true;
           ClearKey();
         }
         if (KeyD)
         {
-          if (brightness > 10)
-            brightness-=10;
+          if (brightness > 0)
+            brightness--;
           update = true;
           ClearKey();
         }
@@ -1873,14 +1859,8 @@ void LCDUpdate()
           LCD.setCursor(0, 0);
           LCD.print("Congratulation!");
           LCD.setCursor(0, 1);
-          LCD.print("Printing finished.");
+          LCD.print("3D Printing Done!");
           LCD.setCursor(0, 2);
-          char stemp[20];
-          long ltemp=(millis()-timer)/1000;
-          sprintf(stemp,"Up Time=%3dh %2dm %2ds",ltemp/3600,(ltemp%3600)/60,(ltemp%60));
-          LCD.print(stemp);
-          ClearKey();
-          Initialize();
           LCD.setCursor(0, 3);
           LCD.print("Press any key");
         }
@@ -2172,43 +2152,9 @@ void LCDTimer() {
           SerialUSB.println("Refresh 8");
           LCD.clear();
           LCD.setCursor(0, 0);
-          LCD.print("Now Printing ");
-          switch(pic)
-          {
-            case 0:
-            {
-              LCD.print("-   ");
-              pic++;
-            }
-            break;
-            case 1:
-            {
-              LCD.write(7);
-              LCD.print(".  ");
-              pic++;
-            }
-            break;
-            case 2:
-            {
-              LCD.print("|.. ");
-              pic++;
-            }
-            break;
-            case 3:
-            {
-              LCD.print("/...");
-              pic=0;
-            }
-            break;
-          }
-          LCD.setCursor(0, 1);
-          LCD.print("File= ");
+          LCD.print("Now Printing File:");
+          LCD.setCursor(1, 1);
           LCD.print(filename);
-          LCD.setCursor(0, 2);
-          char stemp[20];
-          long ltemp=(millis()-timer)/1000;
-          sprintf(stemp,"Up Time=%3dh %2dm %2ds",ltemp/3600,(ltemp%3600)/60,(ltemp%60));
-          LCD.print(stemp);
           long stopposition = bufferstartposition[buffernum] + printi;
           double report;
           if (printi == BUFFER_SIZE - 1)
@@ -2231,22 +2177,17 @@ void LCDTimer() {
           LCD.clear();
           LCD.setCursor(0, 0);
           char stemp[20];
-          char degree[2]={0xdf,0};
-          sprintf(stemp, "Ext= % 3.0lf%sC -> %3d", extruder_input,degree, extruder_temp);
+          sprintf(stemp, "Ext= % 3.0lf C -> %3d C", extruder_input, extruder_temp);
           LCD.print(stemp);
-          LCD.write(0xdf);
-          LCD.print("C");
           LCD.setCursor(0, 1);
-          sprintf(stemp, "Bed= % 3.0lf%sC -> %3d", bed_input,degree, bed_temp);
+          sprintf(stemp, "Bed= % 3.0lf C -> %3d C", bed_input, bed_temp);
           LCD.print(stemp);
-          LCD.write(0xdf);
-          LCD.print("C");
           LCD.setCursor(0, 2);
-          sprintf(stemp, "Fan= % 3d E=%8.2f", fan_speed, current.e);
+          sprintf(stemp, "Fan= % 3d  E=%7lf", fan_speed, current.e);
           LCD.print(stemp);
           LCD.setCursor(0, 3);
           int xtemp = current.x, ytemp = current.y, ztemp = current.z;
-          sprintf(stemp, "X=% 3d Y=% 3d Z= % 3d", xtemp, ytemp, ztemp);
+          sprintf(stemp, "X=% 3d Y=% 3d Z=% 3d", xtemp, ytemp, ztemp);
           LCD.print(stemp);
         }
         break;
