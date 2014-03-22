@@ -606,6 +606,7 @@ void loop() {
           SerialUSB.println();
           SerialUSB.print("Start");
           buffer_switch = 1;
+          refresh=8;
           update = true;
         }
         if (KeyB)
@@ -1610,7 +1611,7 @@ void loop() {
           buffer_switch=1;
           
        
-          
+          refresh=8;
             update = true;
           }
           else
@@ -1812,7 +1813,7 @@ void LCDUpdate()
 
       case 9://Sensor Value
         {
-          //refresh = 9;
+          refresh = 9;
           LCD.setCursor(0, 0);
           char stemp[20];
           sprintf(stemp, "Ext % 3.0lf C -> % 3.0lf C", extruder_input, extruder_temp);
@@ -2148,6 +2149,7 @@ void LCDTimer() {
     {
       case 8:
         {
+          SerialUSB.println("Refresh 8");
           LCD.clear();
           LCD.setCursor(0, 0);
           LCD.print("Now Printing File:");
@@ -2175,13 +2177,13 @@ void LCDTimer() {
           LCD.clear();
           LCD.setCursor(0, 0);
           char stemp[20];
-          sprintf(stemp, "Ext= % 3.0lf C -> % 3.0lf C", extruder_input, extruder_temp);
+          sprintf(stemp, "Ext= % 3.0lf C -> %3d C", extruder_input, extruder_temp);
           LCD.print(stemp);
           LCD.setCursor(0, 1);
-          sprintf(stemp, "Bed= % 3.0lf C -> % 3.0lf C", bed_input, bed_temp);
+          sprintf(stemp, "Bed= % 3.0lf C -> %3d C", bed_input, bed_temp);
           LCD.print(stemp);
           LCD.setCursor(0, 2);
-          sprintf(stemp, "Fan= % 3d  E=%lf", fan_speed, current.e);
+          sprintf(stemp, "Fan= % 3d  E=%7lf", fan_speed, current.e);
           LCD.print(stemp);
           LCD.setCursor(0, 3);
           int xtemp = current.x, ytemp = current.y, ztemp = current.z;
