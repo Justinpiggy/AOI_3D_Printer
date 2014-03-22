@@ -1879,6 +1879,8 @@ void LCDUpdate()
           long ltemp=(millis()-timer)/1000;
           sprintf(stemp,"Up Time=%3dh %2dm %2ds",ltemp/3600,(ltemp%3600)/60,(ltemp%60));
           LCD.print(stemp);
+          ClearKey();
+          Initialize();
           LCD.setCursor(0, 3);
           LCD.print("Press any key");
         }
