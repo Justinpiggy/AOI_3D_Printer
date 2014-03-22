@@ -9,7 +9,7 @@
 #define PAGE_0_MAX 5
 #define PAGE_1_MAX 10
 #define LCD_INTERVAL 500
-#define BUFFER_SIZE 500
+#define BUFFER_SIZE 100
 
 #define X_STEPS_PER_INCH 5080
 #define X_STEPS_PER_MM   200
@@ -1874,10 +1874,11 @@ void LCDUpdate()
           LCD.print("Congratulation!");
           LCD.setCursor(0, 1);
           LCD.print("Printing finished.");
+          
+          char stemp[22];
+          long ltemp=timer/1000;
+          sprintf(stemp,"Time= %3dh %2dm %2ds",int(ltemp/3600),int((ltemp%3600)/60),int(ltemp%60));
           LCD.setCursor(0, 2);
-          char stemp[20];
-          long ltemp=(millis()-timer)/1000;
-          sprintf(stemp,"Up Time=%3dh %2dm %2ds",ltemp/3600,(ltemp%3600)/60,(ltemp%60));
           LCD.print(stemp);
           LCD.setCursor(0, 3);
           LCD.print("Press any key");
@@ -2171,6 +2172,7 @@ void LCDTimer() {
           LCD.clear();
           LCD.setCursor(0, 0);
           LCD.print("Now Printing ");
+          /*
           switch(pic)
           {
             case 0:
@@ -2198,21 +2200,22 @@ void LCDTimer() {
               pic=0;
             }
             break;
-          }
+          }*/
           LCD.setCursor(0, 1);
           LCD.print("File= ");
           LCD.print(filename);
           LCD.setCursor(0, 2);
-          char stemp[20];
+          char stemp[22];
           long ltemp=(millis()-timer)/1000;
-          sprintf(stemp,"Up Time=%3dh %2dm %2ds",ltemp/3600,(ltemp%3600)/60,(ltemp%60));
+          sprintf(stemp,"Up Time=%3dh %2dm %2ds",int(ltemp/3600),int((ltemp%3600)/60),int(ltemp%60));
           LCD.print(stemp);
-          long stopposition = bufferstartposition[buffernum] + printi;
+          stopposition = bufferstartposition[buffernum] + printi;
           double report;
           if (printi == BUFFER_SIZE - 1)
           report = membuffer[1 - buffernum][printi].start;
            else
            report = membuffer[buffernum][printi].start;
+           
           report = membuffer[buffernum][printi].start;
          report /= filesize;
           SerialUSB.print(report*100);
@@ -2228,7 +2231,7 @@ void LCDTimer() {
         {
           LCD.clear();
           LCD.setCursor(0, 0);
-          char stemp[20];
+          char stemp[22];
           char degree[2]={0xdf,0};
           sprintf(stemp, "Ext= % 3.0lf%sC -> %3d", extruder_input,degree, extruder_temp);
           LCD.print(stemp);
