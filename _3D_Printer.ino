@@ -496,7 +496,16 @@ void loop() {
             }
             else
             {
+              if(PAGE_0_MAX>=4)
+              {
               firstrow = PAGE_0_MAX - 4;
+              CursorR=3;
+              }
+              else
+              {
+                firstrow=0;
+                CursorR=PAGE_0_MAX-1;
+              }
               update = true;
             }
           }
@@ -520,6 +529,7 @@ void loop() {
             else
             {
               firstrow = 0;
+              CursorR=0;
               update = true;
             }
           }
@@ -576,9 +586,19 @@ void loop() {
             }
             else
             {
-              firstrow = filemax - 4;
-              update = true;
+              if(filemax>=4)
+              {
+              firstrow =filemax - 4;
+              CursorR=3;
+              }
+              else
+              {
+                firstrow=0;
+                CursorR=filemax-1;
+              }
+              update=true;
             }
+            
           }
           else
           {
@@ -601,6 +621,7 @@ void loop() {
             else
             {
               firstrow = 0;
+              CursorR=0;
               update = true;
             }
           }
@@ -653,6 +674,7 @@ void loop() {
           SerialUSB.println();
           SerialUSB.print("Start");
           buffer_switch = 1;
+          timer=0;
           refresh = 8;
           update = true;
         }
@@ -681,7 +703,16 @@ void loop() {
             }
             else
             {
+              if(PAGE_1_MAX>=4)
+              {
               firstrow = PAGE_1_MAX - 4;
+              CursorR=3;
+              }
+              else
+              {
+                firstrow=0;
+                CursorR=PAGE_1_MAX-1;
+              }
               update = true;
             }
           }
@@ -705,6 +736,7 @@ void loop() {
             else
             {
               firstrow = 0;
+              CursorR=0;
               update = true;
             }
           }
@@ -1082,7 +1114,16 @@ void loop() {
             }
             else
             {
-              firstrow = filemax - 4;
+              if(filemax>=4)
+              {
+              firstrow =filemax - 4;
+              CursorR=3;
+              }
+              else
+              {
+                firstrow=0;
+                CursorR=filemax-1;
+              }
               update = true;
             }
           }
@@ -1107,6 +1148,7 @@ void loop() {
             else
             {
               firstrow = 0;
+              CursorR=0;
               update = true;
             }
           }
@@ -1726,7 +1768,7 @@ void loop() {
             LCD.print("Extruder Approching");
             Move(60000000 / x_unit / MAX_FEEDRATE);
             buffer_switch = 1;
-
+            timer=0;
 
             refresh = 8;
             update = true;
