@@ -72,13 +72,14 @@
 #define LCD_D6 52
 #define LCD_D7 53
 
-#define KeyU_PIN A4
-#define KeyD_PIN A2
-#define KeyR_PIN A6
-#define KeyL_PIN A1
-#define KeyOK_PIN A3
-#define KeyB_PIN A0
-#define KeyEM_PIN A5
+#define KeyU_PIN A5
+#define KeyD_PIN A3
+#define KeyR_PIN A7
+#define KeyL_PIN A2
+#define KeyOK_PIN A4
+#define KeyB_PIN A1
+#define KeyEM_PIN A6
+#define KeyGND A0
 
 struct LongPt {
   long x;
@@ -325,6 +326,8 @@ PID extruder_ctrl(&extruder_input, &extruder_output, &extruder_set, extruder_con
 
 //setup
 void setup() {
+  pinMode(KeyGND,OUTPUT);
+  digitalWrite(KeyGND,LOW);
   SerialUSB.begin(115200);
   while (!SerialUSB)
   {
@@ -1984,6 +1987,12 @@ void LCDUpdate()
 
       case 10://Stop Page
         {
+          bed_pwr=0;
+          extruder_pwr=0;
+          fan_speed=0;
+          digitalWrite(BED_PIN,LOW);
+          digitalWrite(EXTRUDER_PIN,LOW);
+          digitalWrite(FAN_PIN,LOW);
           refresh = -1;
           yield();
           LCD.setCursor(0, 0);
@@ -2011,6 +2020,12 @@ void LCDUpdate()
 
       case 11://Finish Page
         {
+          bed_pwr=0;
+          extruder_pwr=0;
+          fan_speed=0;
+          digitalWrite(BED_PIN,LOW);
+          digitalWrite(EXTRUDER_PIN,LOW);
+          digitalWrite(FAN_PIN,LOW);
           refresh = -1;
           LCD.setCursor(0, 0);
           LCD.print("Congratulation!");
@@ -3760,7 +3775,9 @@ void EM()
   print_switch = 0;
   buffer_switch = 0;
   command_switch = 0;
-
+  digitalWrite(EXTRUDER_PIN,LOW);
+  digitalWrite(BED_PIN,LOW);
+  digitalWrite(FAN_PIN,LOW);
   dataFile.close();
   SerialUSB.print("Printing process is interrupted at ");
   SerialUSB.print(stopposition);
@@ -3793,10 +3810,13 @@ void EM()
   SerialUSB.println("'");
   bed_pwr = 0;
   digitalWrite(BED_PIN, LOW);
+  analogWrite(BED_PIN,0);
   extruder_pwr = 0;
   digitalWrite(EXTRUDER_PIN, LOW);
+  analogWrite(EXTRUDER_PIN,0);
   fan_speed = 0;
   digitalWrite(FAN_PIN, LOW);
+  analogWrite(FAN_PIN,0);
   page = 10;
   EMS = true;
   update = true;
