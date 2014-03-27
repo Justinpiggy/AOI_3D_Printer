@@ -13,7 +13,7 @@
 #define LCD_INTERVAL 500   //LCD refresh interval
 #define BUFFER_SIZE 100   //RAM buffer size
 #define PREHEATING_TIMEOUT 120000   //Preheating time limit
-
+#define SERIAL_TIMEOUT 5000
 
 //Debug switches
 #define CODE_INFO false
@@ -353,7 +353,8 @@ void setup() {
   pinMode(KeyGND, OUTPUT);
   digitalWrite(KeyGND, LOW);
   SerialUSB.begin(115200);
-  while (!SerialUSB)
+  long ti=millis();
+  while ((!SerialUSB)&&((millis()-ti)<SERIAL_TIMEOUT))
   {
   }
   //Waiting for Arduino Due SerialUSB
