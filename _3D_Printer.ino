@@ -353,23 +353,16 @@ void setup() {
   pinMode(KeyGND, OUTPUT);
   digitalWrite(KeyGND, LOW);
   SerialUSB.begin(115200);
-  long ti=millis();
-  while ((!SerialUSB)&&((millis()-ti)<SERIAL_TIMEOUT))
+  long ti = millis();
+  //Waiting for Arduino Due SerialUSB
+  while ((!SerialUSB) && ((millis() - ti) < SERIAL_TIMEOUT))
   {
   }
-  //Waiting for Arduino Due SerialUSB
   //Initialize filename
   for (n = 0; n < 100; n++)
   {
     filename[n] = 0;
   }
-  filename[0] = '1';
-  filename[1] = '.';
-  filename[2] = 't';
-  filename[3] = 'x';
-  filename[4] = 't';
-  filename[5] = 0;
-  filename[6] = 0;
   //Initialize data
   for (n = 0; n < 200; n++)
   {
@@ -505,6 +498,7 @@ void setup() {
   SerialUSB.println("s");
   SerialUSB.println("'$'--COMMAND\n'P'--START PRINTING\n'R'--RESUME\n'S'--STOP\n'F'--FILE\n'I'--REPORT INTERVAL\n'O'--FILE OFFSET\n'L'--LIST SD\n'W'--WRITE TO FILE\n");
   update = true;
+  refresh = -1;
   page = 0;
 }
 
@@ -1783,8 +1777,8 @@ void loop() {
               SerialUSB.println("Preheating Bed");
               LCD.setCursor(0, 3);
               LCD.print("Preheating Bed      ");
-              long timeout=millis();
-              while ((!bed_ok)&&((millis()-timeout)<PREHEATING_TIMEOUT))
+              long timeout = millis();
+              while ((!bed_ok) && ((millis() - timeout) < PREHEATING_TIMEOUT))
               {
                 yield();
               }
@@ -1796,8 +1790,8 @@ void loop() {
               SerialUSB.println("Preheating Extruder");
               LCD.setCursor(0, 3);
               LCD.print("Preheating Extruder ");
-              long timeout=millis();
-              while ((!extruder_ok)&&((millis()-timeout)<PREHEATING_TIMEOUT))
+              long timeout = millis();
+              while ((!extruder_ok) && ((millis() - timeout) < PREHEATING_TIMEOUT))
               {
                 yield();
               }
@@ -2450,283 +2444,283 @@ void LCDTimer() {
 
 
 void SerialCLI() {
-  if(EN_SERIAL_CLI)
+  if (EN_SERIAL_CLI)
   {
-  char c;
-  while (SerialUSB.available()) {
-    if (i == 0)
-    {
-      c = SerialUSB.read();
-      i = 1;
+    char c;
+    while (SerialUSB.available()) {
+      if (i == 0)
+      {
+        c = SerialUSB.read();
+        i = 1;
+      }
+      else
+      {
+        data[i - 1] = SerialUSB.read();
+        if (data[i - 1] == '\r' || data[i - 1] == '\n')
+          flag = 1;
+        i++;
+      }
     }
-    else
+    if (flag > 0)
     {
-      data[i - 1] = SerialUSB.read();
-      if (data[i - 1] == '\r' || data[i - 1] == '\n')
-        flag = 1;
-      i++;
-    }
-  }
-  if (flag > 0)
-  {
-    switch (c) {
-      case '0' :
-        break;
+      switch (c) {
+        case '0' :
+          break;
 
-      case 'P' :
-        SerialUSB.print("Printing File: ");
-        for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
-        {
-          SerialUSB.print(filename[n]);
-        }
-        SerialUSB.println();
-        fileposition = 0;
-        for (int cn = 0; cn < BUFFER_SIZE; cn++)
-        {
-          membuffer[0][cn].start = 0;
-          membuffer[0][cn].leng = 0;
-          for (int cst = 0; cst < 50; cst++)
-            membuffer[0][cn].st[cst] = 0;
-        }
-        for (int cn = 0; n < BUFFER_SIZE; n++)
-        {
-          membuffer[1][cn].start = 0;
-          membuffer[1][cn].leng = 0;
-          for (int cst = 0; cst < 50; cst++)
-            membuffer[1][cn].st[cst] = 0;
-        }
-
-        buffer_switch = 1;
-        break;
-
-      case 'F' :
-        SerialUSB.print("File path set to: ");
-        for (n = 0; ((n < i - 1) && (data[n] != '\r') && (data[n] != '\n')); n++)
-        {
-          filename[n] = data[n];
-        }
-        filename[n] = 0;
-        for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
-        {
-          SerialUSB.print(filename[n]);
-        }
-
-        break;
-
-      case 'W' :
-        dataFile = SD.open(filename, FILE_WRITE);
-        if (dataFile) {
-          dataFile.seek(fileposition);
-          for (n = 0; n < i - 1; n++)
-          {
-            dataFile.write(data[n]);
-          }
-          dataFile.close();
-        }
-        else {
-          SerialUSB.println("ERROR: Cannot open the file");
-        }
-        break;
-      case 'R' :
-        {
-          double resume_e = strtod(data, NULL);
-          command_switch = 1;
-          Decode("G0 X-100 Y-100 Z300", 18);
-          command_switch = 1;
-          Decode("G0 Z-100", 9);
-          SETtarget(0, 0, 0, 0);
-          SETposition(0, 0, 0, 0);
-          command_switch = 1;
-          Decode("G0 X280 Y280 Z280", 18);
-          if (FindData('X', data, i - 1) != 32767)
-          {
-            target.x = FindData('X', data, i - 1);
-          }
-          if (FindData('Y', data, i - 1) != 32767)
-          {
-            target.y = FindData('Y', data, i - 1);
-          }
-          if (FindData('Z', data, i - 1) != 32767)
-          {
-            target.z = FindData('Z', data, i - 1);
-          }
-          if (FindData('E', data, i - 1) != 32767)
-          {
-            target.e = FindData('E', data, i - 1);
-            current.e = target.e;
-          }
-          if (FindData('F', data, i - 1) != 32767)
-          {
-            feedrate = FindData('F', data, i - 1);
-          }
-          if (FindData('B', data, i - 1) != 32767)
-          {
-            bed_temp = FindData('B', data, i - 1);
-            if (bed_temp == 0)
-              bed_pwr = 0;
-            else
-            {
-              bed_pwr = 1;
-              SerialUSB.println("Preheating Bed");
-              long timeout=millis();
-              while ((!bed_ok)&&((millis()-timeout)<PREHEATING_TIMEOUT))
-              {
-                yield();
-              }
-            }
-          }
-          if (FindData('H', data, i - 1) != 32767)
-          {
-            extruder_temp = FindData('H', data, i - 1);
-            if (extruder_temp == 0)
-              extruder_pwr = 0;
-            else {
-              extruder_pwr = 1;
-              SerialUSB.println("Preheating Extruder");
-              long timeout=millis();
-              while ((!extruder_ok)&&((millis()-timeout)<PREHEATING_TIMEOUT))
-              {
-                yield();
-              }
-            }
-          }
-          if (FindData('C', data, i - 1) != 32767)
-          {
-            fan_speed = FindData('C', data, i - 1);
-            analogWrite(FAN_PIN, fan_speed);
-          }
-          CalDelta();
-          Move(60000000 / x_unit / MAX_FEEDRATE);
-          dataFile = SD.open(filename);
-          if (dataFile)
-          {
-            if (fileposition < dataFile.size())
-            {
-              SerialUSB.print("Resume printing process from ");
-              SerialUSB.print(fileposition);
-              SerialUSB.print(" at the file ");
-              for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
-              {
-                SerialUSB.print(filename[n]);
-              }
-              SerialUSB.println();
-
-              dataFile.close();
-              buffer_switch = 1;
-            }
-            else {
-              SerialUSB.println("ERROR: Resume position exceeds file size");
-            }
-
-          }
-          else {
-            SerialUSB.println("ERROR: Cannot open the file");
-          }
-        }
-        break;
-      case 'O' :
-        {
-          char strtemp[100];
-          for (n = 0; n < i - 1; n++)
-          {
-            strtemp[n] = data[n];
-          }
-          fileposition = atoi(strtemp);
-          SerialUSB.print("Set file offset to ");
-          SerialUSB.println(fileposition);
-        }
-        break;
-      case '$' :
-        datalength = i - 2;
-        SerialUSB.print("$");
-        for (i = 0; i < datalength; i++)
-        {
-          SerialUSB.print(data[i]);
-        }
-        SerialUSB.println();
-        command_switch = 1;
-        Decode(data, datalength);
-        command_switch = 0;
-        SerialUSB.println("DONE");
-        break;
-      case 'I' :
-        SerialUSB.print("Report Interval= ");
-        report_delay = strtod(data, NULL);
-        SerialUSB.print(report_delay);
-        SerialUSB.println(" s");
-        break;
-      case 'L' :
-        {
-          SerialUSB.println("SD Card root directory:");
-          filemax = ListSD();
-          for (int fc = 0; fc < filemax; fc++)
-            SerialUSB.println(list[fc]);
-        }
-        break;
-      case 'H' :
-        {
-          SerialUSB.println("HELP MENU");
-          SerialUSB.println("'$'--COMMAND\n'P'--START PRINTING\n'R'--RESUME\n'S'--STOP\n'F'--FILE\n'I'--REPORT INTERVAL\n'O'--FILE OFFSET\n'L'--LIST SD\n'W'--WRITE TO FILE\n");
-        }
-        break;
-      case 'S' :
-        {
-          stopposition = membuffer[buffernum][printi].start;
-          stopline = bufferstartposition[buffernum] + printi;
-          buffer_switch = 0;
-          print_switch = 0;
-          buffer_switch = 0;
-          command_switch = 0;
-          yield();
-          dataFile.close();
-
-          SerialUSB.print("Printing process is interrupted at ");
-          SerialUSB.print(stopposition);
-          SerialUSB.print("(Instruction No. ");
-          SerialUSB.print(stopline);
-          SerialUSB.print(") of the file '");
+        case 'P' :
+          SerialUSB.print("Printing File: ");
           for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
           {
             SerialUSB.print(filename[n]);
           }
-          SerialUSB.println("'");
+          SerialUSB.println();
+          fileposition = 0;
+          for (int cn = 0; cn < BUFFER_SIZE; cn++)
+          {
+            membuffer[0][cn].start = 0;
+            membuffer[0][cn].leng = 0;
+            for (int cst = 0; cst < 50; cst++)
+              membuffer[0][cn].st[cst] = 0;
+          }
+          for (int cn = 0; n < BUFFER_SIZE; n++)
+          {
+            membuffer[1][cn].start = 0;
+            membuffer[1][cn].leng = 0;
+            for (int cst = 0; cst < 50; cst++)
+              membuffer[1][cn].st[cst] = 0;
+          }
 
-          SerialUSB.print("Resume Argument: ");
-          SerialUSB.print("'X");
-          SerialUSB.print(current.x);
-          SerialUSB.print(" Y");
-          SerialUSB.print(current.y);
-          SerialUSB.print(" Z");
-          SerialUSB.print(current.z);
-          SerialUSB.print(" E");
-          SerialUSB.print(current.e);
-          SerialUSB.print(" F");
-          SerialUSB.print(feedrate);
-          SerialUSB.print(" B");
-          SerialUSB.print(bed_temp);
-          SerialUSB.print(" H");
-          SerialUSB.print(extruder_temp);
-          SerialUSB.print(" C");
-          SerialUSB.print(fan_speed);
-          SerialUSB.println("'");
-          bed_pwr = 0;
-          digitalWrite(BED_PIN, LOW);
-          extruder_pwr = 0;
-          digitalWrite(EXTRUDER_PIN, LOW);
-          fan_speed = 0;
-          digitalWrite(FAN_PIN, LOW);
-          page = 10;
-          firstrow = 0;
-          CursorR = 0;
-          update = true;
+          buffer_switch = 1;
+          break;
 
-        }
-        break;
+        case 'F' :
+          SerialUSB.print("File path set to: ");
+          for (n = 0; ((n < i - 1) && (data[n] != '\r') && (data[n] != '\n')); n++)
+          {
+            filename[n] = data[n];
+          }
+          filename[n] = 0;
+          for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
+          {
+            SerialUSB.print(filename[n]);
+          }
+
+          break;
+
+        case 'W' :
+          dataFile = SD.open(filename, FILE_WRITE);
+          if (dataFile) {
+            dataFile.seek(fileposition);
+            for (n = 0; n < i - 1; n++)
+            {
+              dataFile.write(data[n]);
+            }
+            dataFile.close();
+          }
+          else {
+            SerialUSB.println("ERROR: Cannot open the file");
+          }
+          break;
+        case 'R' :
+          {
+            double resume_e = strtod(data, NULL);
+            command_switch = 1;
+            Decode("G0 X-100 Y-100 Z300", 18);
+            command_switch = 1;
+            Decode("G0 Z-100", 9);
+            SETtarget(0, 0, 0, 0);
+            SETposition(0, 0, 0, 0);
+            command_switch = 1;
+            Decode("G0 X280 Y280 Z280", 18);
+            if (FindData('X', data, i - 1) != 32767)
+            {
+              target.x = FindData('X', data, i - 1);
+            }
+            if (FindData('Y', data, i - 1) != 32767)
+            {
+              target.y = FindData('Y', data, i - 1);
+            }
+            if (FindData('Z', data, i - 1) != 32767)
+            {
+              target.z = FindData('Z', data, i - 1);
+            }
+            if (FindData('E', data, i - 1) != 32767)
+            {
+              target.e = FindData('E', data, i - 1);
+              current.e = target.e;
+            }
+            if (FindData('F', data, i - 1) != 32767)
+            {
+              feedrate = FindData('F', data, i - 1);
+            }
+            if (FindData('B', data, i - 1) != 32767)
+            {
+              bed_temp = FindData('B', data, i - 1);
+              if (bed_temp == 0)
+                bed_pwr = 0;
+              else
+              {
+                bed_pwr = 1;
+                SerialUSB.println("Preheating Bed");
+                long timeout = millis();
+                while ((!bed_ok) && ((millis() - timeout) < PREHEATING_TIMEOUT))
+                {
+                  yield();
+                }
+              }
+            }
+            if (FindData('H', data, i - 1) != 32767)
+            {
+              extruder_temp = FindData('H', data, i - 1);
+              if (extruder_temp == 0)
+                extruder_pwr = 0;
+              else {
+                extruder_pwr = 1;
+                SerialUSB.println("Preheating Extruder");
+                long timeout = millis();
+                while ((!extruder_ok) && ((millis() - timeout) < PREHEATING_TIMEOUT))
+                {
+                  yield();
+                }
+              }
+            }
+            if (FindData('C', data, i - 1) != 32767)
+            {
+              fan_speed = FindData('C', data, i - 1);
+              analogWrite(FAN_PIN, fan_speed);
+            }
+            CalDelta();
+            Move(60000000 / x_unit / MAX_FEEDRATE);
+            dataFile = SD.open(filename);
+            if (dataFile)
+            {
+              if (fileposition < dataFile.size())
+              {
+                SerialUSB.print("Resume printing process from ");
+                SerialUSB.print(fileposition);
+                SerialUSB.print(" at the file ");
+                for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
+                {
+                  SerialUSB.print(filename[n]);
+                }
+                SerialUSB.println();
+
+                dataFile.close();
+                buffer_switch = 1;
+              }
+              else {
+                SerialUSB.println("ERROR: Resume position exceeds file size");
+              }
+
+            }
+            else {
+              SerialUSB.println("ERROR: Cannot open the file");
+            }
+          }
+          break;
+        case 'O' :
+          {
+            char strtemp[100];
+            for (n = 0; n < i - 1; n++)
+            {
+              strtemp[n] = data[n];
+            }
+            fileposition = atoi(strtemp);
+            SerialUSB.print("Set file offset to ");
+            SerialUSB.println(fileposition);
+          }
+          break;
+        case '$' :
+          datalength = i - 2;
+          SerialUSB.print("$");
+          for (i = 0; i < datalength; i++)
+          {
+            SerialUSB.print(data[i]);
+          }
+          SerialUSB.println();
+          command_switch = 1;
+          Decode(data, datalength);
+          command_switch = 0;
+          SerialUSB.println("DONE");
+          break;
+        case 'I' :
+          SerialUSB.print("Report Interval= ");
+          report_delay = strtod(data, NULL);
+          SerialUSB.print(report_delay);
+          SerialUSB.println(" s");
+          break;
+        case 'L' :
+          {
+            SerialUSB.println("SD Card root directory:");
+            filemax = ListSD();
+            for (int fc = 0; fc < filemax; fc++)
+              SerialUSB.println(list[fc]);
+          }
+          break;
+        case 'H' :
+          {
+            SerialUSB.println("HELP MENU");
+            SerialUSB.println("'$'--COMMAND\n'P'--START PRINTING\n'R'--RESUME\n'S'--STOP\n'F'--FILE\n'I'--REPORT INTERVAL\n'O'--FILE OFFSET\n'L'--LIST SD\n'W'--WRITE TO FILE\n");
+          }
+          break;
+        case 'S' :
+          {
+            stopposition = membuffer[buffernum][printi].start;
+            stopline = bufferstartposition[buffernum] + printi;
+            buffer_switch = 0;
+            print_switch = 0;
+            buffer_switch = 0;
+            command_switch = 0;
+            yield();
+            dataFile.close();
+
+            SerialUSB.print("Printing process is interrupted at ");
+            SerialUSB.print(stopposition);
+            SerialUSB.print("(Instruction No. ");
+            SerialUSB.print(stopline);
+            SerialUSB.print(") of the file '");
+            for (n = 0; ((filename[n] != '\n') && (filename[n] != '\0')); n++)
+            {
+              SerialUSB.print(filename[n]);
+            }
+            SerialUSB.println("'");
+
+            SerialUSB.print("Resume Argument: ");
+            SerialUSB.print("'X");
+            SerialUSB.print(current.x);
+            SerialUSB.print(" Y");
+            SerialUSB.print(current.y);
+            SerialUSB.print(" Z");
+            SerialUSB.print(current.z);
+            SerialUSB.print(" E");
+            SerialUSB.print(current.e);
+            SerialUSB.print(" F");
+            SerialUSB.print(feedrate);
+            SerialUSB.print(" B");
+            SerialUSB.print(bed_temp);
+            SerialUSB.print(" H");
+            SerialUSB.print(extruder_temp);
+            SerialUSB.print(" C");
+            SerialUSB.print(fan_speed);
+            SerialUSB.println("'");
+            bed_pwr = 0;
+            digitalWrite(BED_PIN, LOW);
+            extruder_pwr = 0;
+            digitalWrite(EXTRUDER_PIN, LOW);
+            fan_speed = 0;
+            digitalWrite(FAN_PIN, LOW);
+            page = 10;
+            firstrow = 0;
+            CursorR = 0;
+            update = true;
+
+          }
+          break;
+      }
+      flag = 0;
+      i = 0;
+      c = 0;
     }
-    flag = 0;
-    i = 0;
-    c = 0;
-  }
   }
   yield();
 }
@@ -2806,54 +2800,54 @@ void Print()
 
 void SerialUSBReport()
 {
-  if(EN_SERIAL_REPORT)
+  if (EN_SERIAL_REPORT)
   {
-  if (report_delay)
-  {
-    double report;
-    if (printi == BUFFER_SIZE - 1)
-      report = membuffer[1 - buffernum][printi].start;
-    else
-      report = membuffer[buffernum][printi].start;
-    report /= filesize;
-    SerialUSB.print("[");
-    for (n = 0; n < 60; n++)
+    if (report_delay)
     {
-      if (n < (60 * report))
-      {
-        SerialUSB.print("=");
-      }
+      double report;
+      if (printi == BUFFER_SIZE - 1)
+        report = membuffer[1 - buffernum][printi].start;
       else
+        report = membuffer[buffernum][printi].start;
+      report /= filesize;
+      SerialUSB.print("[");
+      for (n = 0; n < 60; n++)
       {
-        SerialUSB.print(" ");
+        if (n < (60 * report))
+        {
+          SerialUSB.print("=");
+        }
+        else
+        {
+          SerialUSB.print(" ");
+        }
       }
-    }
-    SerialUSB.print("] ");
-    SerialUSB.print(report * 100);
-    SerialUSB.print("%\nFile position= ");
-    if (printi == BUFFER_SIZE - 1)
-      SerialUSB.print(membuffer[1 - buffernum][printi].start);
-    else
-      SerialUSB.print(membuffer[buffernum][printi].start);
+      SerialUSB.print("] ");
+      SerialUSB.print(report * 100);
+      SerialUSB.print("%\nFile position= ");
+      if (printi == BUFFER_SIZE - 1)
+        SerialUSB.print(membuffer[1 - buffernum][printi].start);
+      else
+        SerialUSB.print(membuffer[buffernum][printi].start);
 
-    SerialUSB.print(" | Instruction No.= ");
-    SerialUSB.println(bufferstartposition[buffernum] + printi + 1);
-    SerialUSB.println(printi);
-    SerialUSB.println(buffernum);
-    SerialUSB.println(membuffer[buffernum][printi].start);
-    SerialUSB.print("Extruder Temp= ");
-    SerialUSB.print(extruder_input);
-    SerialUSB.print(" C / ");
-    SerialUSB.print(extruder_temp);
-    SerialUSB.print(" C | Bed Temp= ");
-    SerialUSB.print(bed_input);
-    SerialUSB.print(" C / ");
-    SerialUSB.print(bed_temp);
-    SerialUSB.print(" C | Fan Speed= ");
-    SerialUSB.println(fan_speed);
-    SerialUSB.println(timer);
-    delay(report_delay * 1000);
-  }
+      SerialUSB.print(" | Instruction No.= ");
+      SerialUSB.println(bufferstartposition[buffernum] + printi + 1);
+      SerialUSB.println(printi);
+      SerialUSB.println(buffernum);
+      SerialUSB.println(membuffer[buffernum][printi].start);
+      SerialUSB.print("Extruder Temp= ");
+      SerialUSB.print(extruder_input);
+      SerialUSB.print(" C / ");
+      SerialUSB.print(extruder_temp);
+      SerialUSB.print(" C | Bed Temp= ");
+      SerialUSB.print(bed_input);
+      SerialUSB.print(" C / ");
+      SerialUSB.print(bed_temp);
+      SerialUSB.print(" C | Fan Speed= ");
+      SerialUSB.println(fan_speed);
+      SerialUSB.println(timer);
+      delay(report_delay * 1000);
+    }
   }
   yield();
 }
@@ -3498,8 +3492,8 @@ void Decode(char instruction[], int length)
           extruder_temp = FindData('S', instruction, length);
           SerialUSB.println(extruder_temp);
           extruder_pwr = 1;
-          long timeout=millis();
-          while ((!extruder_ok) && (print_switch == 1)&&((millis()-timeout)<PREHEATING_TIMEOUT))
+          long timeout = millis();
+          while ((!extruder_ok) && (print_switch == 1) && ((millis() - timeout) < PREHEATING_TIMEOUT))
           {
             yield();
           }
@@ -3520,8 +3514,8 @@ void Decode(char instruction[], int length)
             bed_temp = FindData('S', instruction, length);
             SerialUSB.println(bed_temp);
             bed_pwr = 1;
-            long timeout=millis();
-            while ((!bed_ok) && (print_switch == 1)&&((millis()-timeout)<PREHEATING_TIMEOUT))
+            long timeout = millis();
+            while ((!bed_ok) && (print_switch == 1) && ((millis() - timeout) < PREHEATING_TIMEOUT))
             {
               yield();
             }
@@ -3990,7 +3984,7 @@ void Move(long micro_delay)
     PIOD->PIO_OWER = 0x0F;
     PIOD->PIO_OWDR = 0xFFFFFFF0;
     PIOD->PIO_ODSR = movecmd;
-    long us = delaytime +start;
+    long us = delaytime + start;
     while (micros() < us) {
       yield();
     }
