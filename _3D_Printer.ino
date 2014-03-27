@@ -14,11 +14,14 @@
 #define BUFFER_SIZE 100   //RAM buffer size
 #define PREHEATING_TIMEOUT 120000   //Preheating time limit
 
+
 //Debug switches
 #define CODE_INFO false
 #define POS_INFO false
 #define CMD_INFO false
 #define BUF_INFO false
+#define EN_SERIAL_CLI false
+#define EN_SERIAL_REPORT false
 
 //X-axis stepper settings
 #define X_STEPS_PER_INCH 5080
@@ -1987,8 +1990,9 @@ void LCDUpdate()
         {
           refresh = 8;
           LCD.setCursor(0, 0);
-          LCD.print("Now Printing File:");
-          LCD.setCursor(1, 1);
+          LCD.print("Now Printing ");
+          LCD.setCursor(0, 1);
+          LCD.print("File= ");
           LCD.print(filename);
           double report = (double)(fileposition / filesize);
           ShowProgress(0, 3, 15, report);
@@ -2030,8 +2034,6 @@ void LCDUpdate()
           yield();
           LCD.setCursor(0, 0);
           EMS = false;
-          //stopposition = bufferstartposition[buffernum] + printi;
-          //stopline = membuffer[buffernum][printi].start;
           LCD.print("STOP Pos= ");
           LCD.print(stopposition);
           LCD.setCursor(0, 1);
@@ -2353,14 +2355,11 @@ void LCDTimer() {
 
   if (refresh > 0)
   {
-    analogWrite(LCD_LED_PIN, brightness);
     switch (refresh)
     {
       case 8:
         {
-          LCD.clear();
-          LCD.setCursor(0, 0);
-          LCD.print("Now Printing ");
+          LCD.setCursor(13, 0);
           switch (pic)
           {
             case 0:
@@ -2389,9 +2388,6 @@ void LCDTimer() {
               }
               break;
           }
-          LCD.setCursor(0, 1);
-          LCD.print("File= ");
-          LCD.print(filename);
           LCD.setCursor(0, 2);
           char stemp[22];
           long ltemp = (millis() - timer) / 1000;
@@ -2453,6 +2449,8 @@ void LCDTimer() {
 
 
 void SerialCLI() {
+  if(EN_SERIAL_CLI)
+  {
   char c;
   while (SerialUSB.available()) {
     if (i == 0)
@@ -2728,6 +2726,7 @@ void SerialCLI() {
     i = 0;
     c = 0;
   }
+  }
   yield();
 }
 
@@ -2806,6 +2805,8 @@ void Print()
 
 void SerialUSBReport()
 {
+  if(EN_SERIAL_REPORT)
+  {
   if (report_delay)
   {
     double report;
@@ -2851,6 +2852,7 @@ void SerialUSBReport()
     SerialUSB.println(fan_speed);
     SerialUSB.println(timer);
     delay(report_delay * 1000);
+  }
   }
   yield();
 }
@@ -3908,7 +3910,7 @@ void Move(long micro_delay)
   boolean StopE = false;
   unsigned int movecmd = 0;
   long time = micros();
-  long delay_counter = 40;
+  long delay_counter = 20;
   long steps_sum;
   steps_sum = -((long)current_steps.x - (long)target_steps.x) * (x_direction ? 1 : -1);
   steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
@@ -3920,15 +3922,14 @@ void Move(long micro_delay)
     steps_sum = -((long)current_steps.x - (long)target_steps.x) * (x_direction ? 1 : -1);
     steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
     steps_sum += -((long)current_steps.z - (long)target_steps.z) * (z_direction ? 1 : -1);
-    if (steps_sum > (all_steps - 5))
+    if (steps_sum > (all_steps - 10))
     {
       delaytime -= delay_counter;
     }
-    if (steps_sum < 5)
+    if (steps_sum < 10)
     {
       delaytime += delay_counter;
     }
-
     PIOD->PIO_OWER = 0x0F;
     PIOD->PIO_OWDR = 0xFFFFFFF0;
     PIOD->PIO_ODSR = 0;
@@ -3988,8 +3989,7 @@ void Move(long micro_delay)
     PIOD->PIO_OWER = 0x0F;
     PIOD->PIO_OWDR = 0xFFFFFFF0;
     PIOD->PIO_ODSR = movecmd;
-    long startt = micros();
-    long us = delaytime - (micros() - start) + startt;
+    long us = delaytime +start;
     while (micros() < us) {
       yield();
     }
