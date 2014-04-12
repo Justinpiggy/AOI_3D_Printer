@@ -14,6 +14,7 @@
 #define BUFFER_SIZE 100   //RAM buffer size
 #define PREHEATING_TIMEOUT 120000   //Preheating time limit
 #define SERIAL_TIMEOUT 5000
+#define MAX_LCDTIME 100
 
 //Debug switches
 #define CODE_INFO false
@@ -310,6 +311,8 @@ long stopposition, stopline;
 boolean decoding = false;
 boolean extruder_ok = false;
 boolean bed_ok = false;
+boolean timeok = true;
+boolean moving = false;
 //Number selector
 long Dec[10] = {
   1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
@@ -696,6 +699,8 @@ void loop() {
           SerialUSB.println();
           SerialUSB.print("Start");
           buffer_switch = 1;
+          moving = false;
+          timeok = true;
           timer = 0;
           refresh = 8;
           update = true;
@@ -1802,6 +1807,8 @@ void loop() {
             LCD.print("Extruder Approching");
             Move(60000000 / x_unit / MAX_FEEDRATE);
             buffer_switch = 1;
+            moving = false;
+            timeok = true;
             timer = 0;
 
             refresh = 8;
@@ -2348,7 +2355,7 @@ void LCDUpdate()
 
 void LCDTimer() {
 
-  if (refresh > 0)
+  if ((refresh > 0) && (!((!timeok) && moving)))
   {
     switch (refresh)
     {
@@ -2491,6 +2498,8 @@ void SerialCLI() {
           }
 
           buffer_switch = 1;
+          moving = false;
+          timeok = true;
           break;
 
         case 'F' :
@@ -2607,6 +2616,8 @@ void SerialCLI() {
 
                 dataFile.close();
                 buffer_switch = 1;
+                moving = false;
+                timeok = true;
               }
               else {
                 SerialUSB.println("ERROR: Resume position exceeds file size");
@@ -2671,6 +2682,7 @@ void SerialCLI() {
             print_switch = 0;
             buffer_switch = 0;
             command_switch = 0;
+            moving = false;
             yield();
             dataFile.close();
 
@@ -3821,8 +3833,8 @@ void EM()
   stopline = bufferstartposition[buffernum] + printi;
   buffer_switch = 0;
   print_switch = 0;
-  buffer_switch = 0;
   command_switch = 0;
+  moving = false;
   digitalWrite(EXTRUDER_PIN, LOW);
   digitalWrite(BED_PIN, LOW);
   digitalWrite(FAN_PIN, LOW);
@@ -3911,6 +3923,7 @@ void Move(long micro_delay)
   steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
   steps_sum += -((long)current_steps.z - (long)target_steps.z) * (z_direction ? 1 : -1);
   long all_steps = steps_sum;
+  moving = true;
   do
   {
     long start = micros();
@@ -3986,6 +3999,14 @@ void Move(long micro_delay)
     PIOD->PIO_ODSR = movecmd;
     long us = delaytime + start;
     while (micros() < us) {
+      if ((us - micros()) > MAX_LCDTIME)
+      {
+        timeok = true;
+      }
+      else
+      {
+        timeok = false;
+      }
       yield();
     }
   }
@@ -3995,6 +4016,7 @@ void Move(long micro_delay)
   current.z = current_steps.z / z_unit;
   current.e = current_steps.e / e_unit;
   CalDelta();
+  moving = false;
 }
 
 void StopSteppers()
