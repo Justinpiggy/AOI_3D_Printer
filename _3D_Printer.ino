@@ -3905,7 +3905,7 @@ void Move(long micro_delay)
   boolean StopE = false;
   unsigned int movecmd = 0;
   long time = micros();
-  long delay_counter = 20;
+  long delay_counter = 10;
   long steps_sum;
   steps_sum = -((long)current_steps.x - (long)target_steps.x) * (x_direction ? 1 : -1);
   steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
@@ -3917,11 +3917,11 @@ void Move(long micro_delay)
     steps_sum = -((long)current_steps.x - (long)target_steps.x) * (x_direction ? 1 : -1);
     steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
     steps_sum += -((long)current_steps.z - (long)target_steps.z) * (z_direction ? 1 : -1);
-    if (steps_sum > (all_steps - 10))
+    if (steps_sum > (all_steps - 20))
     {
       delaytime -= delay_counter;
     }
-    if (steps_sum < 10)
+    if (steps_sum < 20)
     {
       delaytime += delay_counter;
     }
