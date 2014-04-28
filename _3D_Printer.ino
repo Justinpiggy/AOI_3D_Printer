@@ -21,8 +21,8 @@
 #define POS_INFO false
 #define CMD_INFO false
 #define BUF_INFO false
-#define EN_SERIAL_CLI false
-#define EN_SERIAL_REPORT false
+#define EN_SERIAL_CLI true
+#define EN_SERIAL_REPORT true
 
 //X-axis stepper settings
 #define X_STEPS_PER_INCH 5080
@@ -39,6 +39,10 @@
 //Extruder stepper settings
 #define E_STEPS_PER_INCH 19050
 #define E_STEPS_PER_MM   200
+
+
+#define CURVE_SECTION_MM 0.019685
+#define CURVE_SECTION_INCH 0.5
 
 //Max feedrate
 #define MAX_FEEDRATE 2400
@@ -263,6 +267,7 @@ double x_unit = X_STEPS_PER_MM;
 double y_unit = Y_STEPS_PER_MM;
 double z_unit = Z_STEPS_PER_MM;
 double e_unit = E_STEPS_PER_MM;
+double curve_section = CURVE_SECTION_MM;
 //Test Register
 volatile boolean TestXMAXPos, TestYMAXPos, TestZMAXPos;
 volatile boolean TestXMINPos, TestYMINPos, TestZMINPos;
@@ -3375,6 +3380,182 @@ void Decode(char instruction[], int length)
         break;
 
 
+      case 2:
+        {
+          if (!abs_mode) {
+            if (FindData('X', instruction, length) != 32767)
+              target.x += FindData('X', instruction, length);
+            if (FindData('Y', instruction, length) != 32767)
+              target.y += FindData('Y', instruction, length);
+            if (FindData('Z', instruction, length) != 32767)
+              target.z += FindData('Z', instruction, length);
+            if (FindData('E', instruction, length) != 32767)
+              target.e += FindData('E', instruction, length);
+          }
+          else
+          {
+            if (FindData('X', instruction, length) != 32767)
+              target.x = FindData('X', instruction, length);
+            if (FindData('Y', instruction, length) != 32767)
+              target.y = FindData('Y', instruction, length);
+            if (FindData('Z', instruction, length) != 32767)
+              target.z = FindData('Z', instruction, length);
+            if (FindData('E', instruction, length) != 32767)
+              target.e = FindData('E', instruction, length);
+          }
+          FloatPt center;
+          float angleA, angleB, angle, radius, length, aX, aY, bX, bY;
+
+          if (FindData('I', instruction, length) != 32767)
+            center.x = current.x + FindData('I', instruction, length);
+          if (FindData('J', instruction, length) != 32767)
+            center.y = current.y + FindData('J', instruction, length);
+
+          aX = (current.x - center.x);
+          aY = (current.y - center.y);
+          bX = (fp.x - center.x);
+          bY = (fp.y - center.y);
+
+          if (code == 2) { // Clockwise
+            angleA = atan2(bY, bX);
+            angleB = atan2(aY, aX);
+          }
+          else { // Counterclockwise
+            angleA = atan2(aY, aX);
+            angleB = atan2(bY, bX);
+          }
+
+          if (angleB <= angleA) angleB += 2 * M_PI;
+          angle = angleB - angleA;
+
+          radius = sqrt(aX * aX + aY * aY);
+          length = radius * angle;
+          int steps, s, step;
+          steps = (int) ceil(length / curve_section);
+
+          for (s = 1; s <= steps; s++) {
+            step = (code == 3) ? s : steps - s; // Work backwards for CW
+            target.x = center.x + radius * cos(angleA + angle * ((float) step / steps));
+            target.y = center.y + radius * sin(angleA + angle * ((float) step / steps));
+            target.z = current.z;
+            // Need to calculate rate for each section of curve
+            if (FindData('F', instruction, length) != 32767)
+              feedrate = FindData('F', instruction, length);
+            CalDelta();
+            if ((feedrate > 0) && (feedrate <= 3000))
+            {
+              long max_step = max(delta_steps.x, delta_steps.y);
+              max_step = max(max_step, delta_steps.z);
+              double temp = delta_steps.x;
+              temp *= delta_steps.x;
+              double space_step = temp;
+              temp = delta_steps.y;
+              temp *= delta_steps.y;
+              space_step += temp;
+              temp = delta_steps.z;
+              temp *= delta_steps.z;
+              space_step += temp;
+              space_step = sqrt(space_step);
+              feedrate_micros = 60000000 / x_unit / feedrate * space_step / max_step;
+            }
+            else
+              feedrate_micros = 60000000 / x_unit / MAX_FEEDRATE;
+
+            Move(feedrate_micros);
+          }
+        }
+        break;
+
+
+
+      case 3:
+        {
+          if (!abs_mode) {
+            if (FindData('X', instruction, length) != 32767)
+              target.x += FindData('X', instruction, length);
+            if (FindData('Y', instruction, length) != 32767)
+              target.y += FindData('Y', instruction, length);
+            if (FindData('Z', instruction, length) != 32767)
+              target.z += FindData('Z', instruction, length);
+            if (FindData('E', instruction, length) != 32767)
+              target.e += FindData('E', instruction, length);
+          }
+          else
+          {
+            if (FindData('X', instruction, length) != 32767)
+              target.x = FindData('X', instruction, length);
+            if (FindData('Y', instruction, length) != 32767)
+              target.y = FindData('Y', instruction, length);
+            if (FindData('Z', instruction, length) != 32767)
+              target.z = FindData('Z', instruction, length);
+            if (FindData('E', instruction, length) != 32767)
+              target.e = FindData('E', instruction, length);
+          }
+          FloatPt center;
+          float angleA, angleB, angle, radius, length, aX, aY, bX, bY;
+
+          if (FindData('I', instruction, length) != 32767)
+            center.x = current.x + FindData('I', instruction, length);
+          if (FindData('J', instruction, length) != 32767)
+            center.y = current.y + FindData('J', instruction, length);
+
+          aX = (current.x - center.x);
+          aY = (current.y - center.y);
+          bX = (fp.x - center.x);
+          bY = (fp.y - center.y);
+
+          if (code == 2) { // Clockwise
+            angleA = atan2(bY, bX);
+            angleB = atan2(aY, aX);
+          }
+          else { // Counterclockwise
+            angleA = atan2(aY, aX);
+            angleB = atan2(bY, bX);
+          }
+
+          if (angleB <= angleA) angleB += 2 * M_PI;
+          angle = angleB - angleA;
+
+          radius = sqrt(aX * aX + aY * aY);
+          length = radius * angle;
+          int steps, s, step;
+          steps = (int) ceil(length / curve_section);
+
+          for (s = 1; s <= steps; s++) {
+            step = (code == 3) ? s : steps - s; // Work backwards for CW
+            target.x = center.x + radius * cos(angleA + angle * ((float) step / steps));
+            target.y = center.y + radius * sin(angleA + angle * ((float) step / steps));
+            target.z = current.z;
+            // Need to calculate rate for each section of curve
+            if (FindData('F', instruction, length) != 32767)
+              feedrate = FindData('F', instruction, length);
+            CalDelta();
+            if ((feedrate > 0) && (feedrate <= 3000))
+            {
+              long max_step = max(delta_steps.x, delta_steps.y);
+              max_step = max(max_step, delta_steps.z);
+              double temp = delta_steps.x;
+              temp *= delta_steps.x;
+              double space_step = temp;
+              temp = delta_steps.y;
+              temp *= delta_steps.y;
+              space_step += temp;
+              temp = delta_steps.z;
+              temp *= delta_steps.z;
+              space_step += temp;
+              space_step = sqrt(space_step);
+              feedrate_micros = 60000000 / x_unit / feedrate * space_step / max_step;
+            }
+            else
+              feedrate_micros = 60000000 / x_unit / MAX_FEEDRATE;
+
+            Move(feedrate_micros);
+          }
+        }
+        break;
+
+
+
       case 4:
         delay((int)FindData('P', instruction, length));
 
@@ -3386,6 +3567,7 @@ void Decode(char instruction[], int length)
         y_unit = Y_STEPS_PER_INCH;
         z_unit = Z_STEPS_PER_INCH;
         e_unit = E_STEPS_PER_INCH;
+        curve_section = CURVE_SECTION_INCH;
         CalDelta();
         SerialUSB.println("UNIT SET TO INCH");
 
@@ -3397,6 +3579,7 @@ void Decode(char instruction[], int length)
         y_unit = Y_STEPS_PER_MM;
         z_unit = Z_STEPS_PER_MM;
         e_unit = E_STEPS_PER_MM;
+        curve_section = CURVE_SECTION_MM;
         CalDelta();
         SerialUSB.println("UNIT SET TO MM");
 
