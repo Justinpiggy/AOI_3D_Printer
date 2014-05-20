@@ -4070,6 +4070,12 @@ void EM()
 
 void Move(long micro_delay)
 {
+  TestXMAXPos=digitalRead(X_MAX_PIN);
+  TestXMINPos=digitalRead(X_MIN_PIN);
+  TestYMAXPos=digitalRead(Y_MAX_PIN);
+  TestYMINPos=digitalRead(Y_MIN_PIN);
+  TestZMAXPos=digitalRead(Z_MAX_PIN);
+  TestZMINPos=digitalRead(Z_MIN_PIN);
   int acc_steps=40;
   long delay_counter = 10;
   long delaytime = micro_delay + acc_steps*delay_counter;
