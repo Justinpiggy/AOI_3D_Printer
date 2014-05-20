@@ -3780,7 +3780,6 @@ void StopXMAX()
 {
   if (digitalRead(X_MAX_PIN) == 0)
   {
-    SerialUSB.println("X->MAX");
     TestXMAXPos = false;
     detachInterrupt(X_MAX_PIN);
     attachInterrupt(X_MAX_PIN, StartXMAX, RISING);
@@ -3811,7 +3810,6 @@ void StopXMIN()
 {
   if (digitalRead(X_MIN_PIN) == 0)
   {
-    SerialUSB.println("X->MIN");
     TestXMINPos = false;
     detachInterrupt(X_MIN_PIN);
     attachInterrupt(X_MIN_PIN, StartXMIN, RISING);
@@ -3841,7 +3839,6 @@ void StartXMAX()
 {
   if (digitalRead(X_MAX_PIN) == 1)
   {
-    SerialUSB.println("X<-MAX");
     TestXMAXPos = true;
     detachInterrupt(X_MAX_PIN);
     attachInterrupt(X_MAX_PIN, StopXMAX, FALLING);
@@ -3871,7 +3868,6 @@ void StartXMIN()
 {
   if (digitalRead(X_MIN_PIN) == 1)
   {
-    SerialUSB.println("X<-MIN");
     TestXMINPos = true;
     detachInterrupt(X_MIN_PIN);
     attachInterrupt(X_MIN_PIN, StopXMIN, FALLING);
@@ -4074,7 +4070,9 @@ void EM()
 
 void Move(long micro_delay)
 {
-  long delaytime = micro_delay + 200;
+  int acc_steps=40;
+  long delay_counter = 10;
+  long delaytime = micro_delay + acc_steps*delay_counter;
   digitalWrite(X_ENABLE_PIN, LOW);
   digitalWrite(Y_ENABLE_PIN, LOW);
   digitalWrite(Z_ENABLE_PIN, LOW);
@@ -4100,8 +4098,9 @@ void Move(long micro_delay)
   boolean StopE = false;
   unsigned int movecmd = 0;
   long time = micros();
-  long delay_counter = 10;
+  
   long steps_sum;
+  
   steps_sum = -((long)current_steps.x - (long)target_steps.x) * (x_direction ? 1 : -1);
   steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
   steps_sum += -((long)current_steps.z - (long)target_steps.z) * (z_direction ? 1 : -1);
@@ -4113,11 +4112,11 @@ void Move(long micro_delay)
     steps_sum = -((long)current_steps.x - (long)target_steps.x) * (x_direction ? 1 : -1);
     steps_sum += -((long)current_steps.y - (long)target_steps.y) * (y_direction ? 1 : -1);
     steps_sum += -((long)current_steps.z - (long)target_steps.z) * (z_direction ? 1 : -1);
-    if (steps_sum > (all_steps - 20))
+    if (steps_sum > (all_steps - acc_steps))
     {
       delaytime -= delay_counter;
     }
-    if (steps_sum < 20)
+    if (steps_sum < acc_steps)
     {
       delaytime += delay_counter;
     }
