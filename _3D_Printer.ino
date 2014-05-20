@@ -26,19 +26,19 @@
 
 //X-axis stepper settings
 #define X_STEPS_PER_INCH 5080
-#define X_STEPS_PER_MM   200
+#define X_STEPS_PER_MM   200 //Subdivistion set to 8 25*Sub
 
 //Y-axis stepper settings
 #define Y_STEPS_PER_INCH 5080
-#define Y_STEPS_PER_MM   200
+#define Y_STEPS_PER_MM   200 //Subdivistion set to 8 25*Sub
 
 //Z-axis stepper settings
 #define Z_STEPS_PER_INCH 5080
-#define Z_STEPS_PER_MM   200
+#define Z_STEPS_PER_MM   200 //Subdivistion set to 8  25*Sub
 
 //Extruder stepper settings
-#define E_STEPS_PER_INCH 19050
-#define E_STEPS_PER_MM   200
+#define E_STEPS_PER_INCH 4700
+#define E_STEPS_PER_MM   185 //Subdivistion set to 32  5.8*Sub
 
 
 #define CURVE_SECTION_MM 0.019685
