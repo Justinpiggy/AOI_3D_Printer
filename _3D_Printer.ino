@@ -4257,9 +4257,9 @@ void CalDelta()
   z_direction = (target.z >= current.z);
   e_direction = (target.e >= current.e);
 
-  digitalWrite(X_DIR_PIN, x_direction);
+  digitalWrite(X_DIR_PIN, !x_direction);
   digitalWrite(Y_DIR_PIN, y_direction);
-  digitalWrite(Z_DIR_PIN, z_direction);
+  digitalWrite(Z_DIR_PIN, !z_direction);
   digitalWrite(E_DIR_PIN, e_direction);
 }
 
